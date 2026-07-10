@@ -149,7 +149,9 @@
 	}
 
 	function renderAudience(d) {
-		var html = '<div class="ot-grid2">' +
+		var html = '<div class="ot-card ot-card-wide"><h3>Mapa de visitantes</h3>' +
+			'<div id="ot-worldmap" class="ot-worldmap"></div></div>';
+		html += '<div class="ot-grid2">' +
 			barList('Dispositivos', d.devices, 'sessions', { label: function (r) { return esc(deviceLabel(r.label)); } }) +
 			barList('Navegadores', d.browsers, 'sessions') +
 			'</div>';
@@ -162,6 +164,7 @@
 			barList('Cidades', d.cities, 'sessions', { label: function (r) { return flag(r.cc) + ' ' + esc(r.label); } }) +
 			'</div>';
 		view.innerHTML = html;
+		drawWorldMap(d.worldmap || []);
 	}
 
 	function renderContent(d) {
@@ -178,6 +181,14 @@
 				'</td><td class="ot-num">' + r.bounce_rate + '%</td></tr>';
 		});
 		html += table('Páginas de entrada', ['Página', 'Sessões', 'Rejeição'], land);
+
+		var out = (d.outbound || []).map(function (r) {
+			return '<tr><td><a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer" class="ot-ext">' + esc(r.url) + '</a></td>' +
+				'<td class="ot-num">' + fmt(r.clicks) + '</td>' +
+				'<td class="ot-num">' + fmt(r.sessions) + '</td></tr>';
+		});
+		html += table('Links de saída', ['Link externo', 'Cliques', 'Sessões'], out);
+		html += barList('Domínios de saída', d.outhosts, 'sessions', { right: function (r) { return fmt(r.sessions) + ' cliques'; } });
 
 		view.innerHTML = html;
 	}
@@ -229,11 +240,254 @@
 		});
 	}
 
+	var worldMap = null;
+
+	function drawWorldMap(rows) {
+		var el = document.getElementById('ot-worldmap');
+		if (!el || typeof jsVectorMap === 'undefined') {
+			if (el) { el.innerHTML = '<p class="ot-empty">' + OT.i18n.empty + '</p>'; }
+			return;
+		}
+		if (worldMap) { try { worldMap.destroy(); } catch (e) {} worldMap = null; }
+		el.innerHTML = '';
+
+		var values = {};
+		rows.forEach(function (r) { if (r.cc) { values[r.cc] = Number(r.sessions) || 0; } });
+
+		try {
+			worldMap = new jsVectorMap({
+				selector: '#ot-worldmap',
+				map: 'world',
+				zoomButtons: true,
+				zoomOnScroll: false,
+				backgroundColor: 'transparent',
+				regionStyle: {
+					initial: { fill: '#232838', stroke: '#0f1117', strokeWidth: 0.4 },
+					hover: { fill: '#6366f1' }
+				},
+				series: {
+					regions: [{
+						attribute: 'fill',
+						scale: ['#2a3350', '#6366f1'],
+						normalizeFunction: 'polynomial',
+						values: values
+					}]
+				},
+				onRegionTooltipShow: function (event, tooltip, code) {
+					var v = values[code] || 0;
+					tooltip.text(tooltip.text() + ': ' + fmt(v) + ' ' + OT.i18n.sessions.toLowerCase(), true);
+				}
+			});
+		} catch (e) {
+			el.innerHTML = '<p class="ot-empty">' + OT.i18n.empty + '</p>';
+		}
+	}
+
+	/* ---------- live access log ---------- */
+
+	var liveTimer = null;
+	var liveLastId = 0;
+	var livePaused = false;
+
+	function stopLive() {
+		if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+	}
+
+	function logRow(r) {
+		var when = (r.time || '').slice(11, 19);
+		var place = (flag(r.cc) + ' ' + esc([r.city, r.country].filter(Boolean).join(', '))).trim();
+		var tags = '';
+		if (r.is_entry) { tags += '<span class="ot-tag ot-tag-entry">entrada</span>'; }
+		tags += r.is_new ? '<span class="ot-tag ot-tag-new">novo</span>' : '<span class="ot-tag">recorrente</span>';
+		return '<tr data-id="' + r.id + '">' +
+			'<td class="ot-log-time">' + esc(when) + '</td>' +
+			'<td><span class="ot-page-title">' + esc(r.title) + '</span><span class="ot-page-path">' + esc(r.path) + '</span>' + tags + '</td>' +
+			'<td><span class="ot-chan ot-chan-' + esc(r.channel) + '">' + esc(r.channel_label) + '</span></td>' +
+			'<td>' + place + '</td>' +
+			'<td>' + esc(deviceLabel(r.device)) + '<span class="ot-log-ua">' + esc([r.browser, r.os].filter(Boolean).join(' · ')) + '</span></td>' +
+			'</tr>';
+	}
+
+	function renderLive(data) {
+		var rows = data.rows || [];
+		liveLastId = rows.length ? rows[0].id : 0;
+		var body = rows.map(logRow).join('');
+		var html = '<div class="ot-live-head">' +
+			'<div class="ot-online"><span class="ot-online-dot"></span><b>' + fmt(data.online) + '</b> ' + OT.i18n.online + '</div>' +
+			'<button class="ot-btn ot-btn-ghost" id="ot-live-toggle">' + (livePaused ? OT.i18n.paused : OT.i18n.live) + '</button>' +
+			'</div>' +
+			'<div class="ot-card ot-card-wide ot-log-card"><table class="ot-table ot-log-table">' +
+			'<thead><tr><th>Hora</th><th>Página</th><th>Canal</th><th>Local</th><th>Dispositivo</th></tr></thead>' +
+			'<tbody id="ot-log-body">' + (body || '<tr><td colspan="5" class="ot-empty">' + OT.i18n.empty + '</td></tr>') + '</tbody>' +
+			'</table></div>';
+		view.innerHTML = html;
+
+		var toggle = document.getElementById('ot-live-toggle');
+		if (toggle) {
+			toggle.classList.toggle('is-live', !livePaused);
+			toggle.addEventListener('click', function () {
+				livePaused = !livePaused;
+				toggle.textContent = livePaused ? OT.i18n.paused : OT.i18n.live;
+				toggle.classList.toggle('is-live', !livePaused);
+			});
+		}
+	}
+
+	function pollLive() {
+		if (livePaused) { return; }
+		post('ot_log', { since: liveLastId, limit: 30 }).then(function (res) {
+			if (!res || !res.success) { return; }
+			var online = document.querySelector('.ot-online b');
+			if (online) { online.textContent = fmt(res.data.online); }
+			var rows = res.data.rows || [];
+			if (!rows.length) { return; }
+			liveLastId = rows[0].id;
+			var body = document.getElementById('ot-log-body');
+			if (!body) { return; }
+			var placeholder = body.querySelector('.ot-empty');
+			if (placeholder) { body.innerHTML = ''; }
+			rows.slice().reverse().forEach(function (r) {
+				body.insertAdjacentHTML('afterbegin', logRow(r));
+			});
+			// Realça as linhas novas.
+			var first = body.querySelectorAll('tr');
+			for (var i = 0; i < rows.length && i < first.length; i++) {
+				first[i].classList.add('ot-log-flash');
+			}
+			// Limita o tamanho da tabela.
+			var all = body.querySelectorAll('tr');
+			for (var j = all.length - 1; j >= 120; j--) { all[j].remove(); }
+		}).catch(function () {});
+	}
+
+	function startLive() {
+		stopLive();
+		view.innerHTML = '<div class="ot-loading">' + OT.i18n.loading + '</div>';
+		post('ot_log', { limit: 50 }).then(function (res) {
+			if (!res || !res.success) { throw new Error('bad'); }
+			renderLive(res.data);
+			liveTimer = setInterval(pollLive, 8000);
+		}).catch(function () {
+			view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + OT.i18n.error + '</p></div>';
+		});
+	}
+
+	/* ---------- goals ---------- */
+
+	function matchLabel(t) {
+		var map = { contains: 'contém', exact: 'igual a', starts: 'começa com' };
+		return map[t] || t;
+	}
+
+	function goalEditorRow(g) {
+		g = g || { id: '', name: '', match_type: 'contains', value: '', active: 1 };
+		var sel = function (v) { return g.match_type === v ? ' selected' : ''; };
+		return '<div class="ot-goal-row" data-id="' + esc(g.id) + '">' +
+			'<input type="text" class="ot-goal-name" placeholder="Nome da meta (ex.: Compra)" value="' + esc(g.name) + '">' +
+			'<select class="ot-goal-match">' +
+			'<option value="contains"' + sel('contains') + '>URL contém</option>' +
+			'<option value="starts"' + sel('starts') + '>URL começa com</option>' +
+			'<option value="exact"' + sel('exact') + '>URL igual a</option>' +
+			'</select>' +
+			'<input type="text" class="ot-goal-value" placeholder="/obrigado" value="' + esc(g.value) + '">' +
+			'<label class="ot-goal-active"><input type="checkbox" class="ot-goal-on"' + (g.active ? ' checked' : '') + '> ativa</label>' +
+			'<button type="button" class="ot-btn ot-btn-danger ot-goal-del">×</button>' +
+			'</div>';
+	}
+
+	function renderGoals(d) {
+		var goals = OT.goals || [];
+		var editor = goals.map(goalEditorRow).join('');
+		var stats = (d.goals || []).map(function (g) {
+			return '<tr><td>' + esc(g.name) + '<span class="ot-page-path">' + esc(matchLabel(g.match_type)) + ' "' + esc(g.value) + '"</span></td>' +
+				'<td class="ot-num">' + fmt(g.conversions) + '</td>' +
+				'<td class="ot-num">' + fmt(g.visitors) + '</td>' +
+				'<td class="ot-num">' + fmt(g.completions) + '</td>' +
+				'<td class="ot-num">' + g.rate + '%</td></tr>';
+		});
+
+		var html = '<div class="ot-card ot-card-wide ot-goals-editor"><h3>Metas de conversão</h3>' +
+			'<p class="ot-muted">Defina uma meta pela URL da página de conversão (ex.: <code>/obrigado</code>, <code>/checkout/sucesso</code>). Uma sessão conta como conversão quando visita uma página que casa com o critério.</p>' +
+			'<div id="ot-goals-list">' + (editor || '') + '</div>' +
+			'<div class="ot-field-actions">' +
+			'<button class="ot-btn ot-btn-ghost" id="ot-goal-add">+ Adicionar meta</button>' +
+			'<button class="ot-btn ot-btn-primary" id="ot-goals-save">Salvar metas</button>' +
+			'<span class="ot-save-msg" id="ot-goals-msg"></span>' +
+			'</div></div>';
+
+		html += table('Desempenho das metas no período', ['Meta', 'Conversões', 'Visitantes', 'Total', 'Taxa'], stats);
+		view.innerHTML = html;
+		bindGoalsEditor();
+	}
+
+	function bindGoalsEditor() {
+		var list = document.getElementById('ot-goals-list');
+		var add = document.getElementById('ot-goal-add');
+		var save = document.getElementById('ot-goals-save');
+		if (add) {
+			add.addEventListener('click', function () {
+				list.insertAdjacentHTML('beforeend', goalEditorRow(null));
+			});
+		}
+		if (list) {
+			list.addEventListener('click', function (ev) {
+				if (ev.target && ev.target.classList.contains('ot-goal-del')) {
+					var row = ev.target.closest('.ot-goal-row');
+					if (row) { row.remove(); }
+				}
+			});
+		}
+		if (save) {
+			save.addEventListener('click', function () {
+				var rows = list ? list.querySelectorAll('.ot-goal-row') : [];
+				var msg = document.getElementById('ot-goals-msg');
+				var body = new URLSearchParams();
+				body.append('action', 'ot_save_goals');
+				body.append('nonce', OT.nonce);
+				var i = 0;
+				rows.forEach(function (r) {
+					var name = r.querySelector('.ot-goal-name').value.trim();
+					var value = r.querySelector('.ot-goal-value').value.trim();
+					if (!name || !value) { return; }
+					var pre = 'goals[' + i + ']';
+					body.append(pre + '[id]', r.getAttribute('data-id') || '');
+					body.append(pre + '[name]', name);
+					body.append(pre + '[match_type]', r.querySelector('.ot-goal-match').value);
+					body.append(pre + '[value]', value);
+					body.append(pre + '[active]', r.querySelector('.ot-goal-on').checked ? 1 : 0);
+					i++;
+				});
+				save.disabled = true;
+				fetch(OT.ajax, {
+					method: 'POST', credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body: body.toString()
+				}).then(function (r) { return r.json(); }).then(function (res) {
+					save.disabled = false;
+					if (res && res.success) {
+						OT.goals = res.data || [];
+						if (msg) { msg.textContent = OT.i18n.goalsSaved; msg.className = 'ot-save-msg ok'; }
+						load();
+					} else if (msg) {
+						msg.textContent = OT.i18n.error; msg.className = 'ot-save-msg err';
+					}
+				}).catch(function () {
+					save.disabled = false;
+					if (msg) { msg.textContent = OT.i18n.error; msg.className = 'ot-save-msg err'; }
+				});
+			});
+		}
+	}
+
 	/* ---------- load ---------- */
 
 	function load() {
 		if (!view) { return; }
 		var tab = view.getAttribute('data-tab') || 'dashboard';
+
+		if (tab === 'live') { startLive(); return; }
+		stopLive();
+
 		view.innerHTML = '<div class="ot-loading">' + OT.i18n.loading + '</div>';
 
 		post('ot_report', { range: state.range, start: state.start, end: state.end })
@@ -243,6 +497,7 @@
 				if (tab === 'acquisition') { renderAcquisition(d); }
 				else if (tab === 'audience') { renderAudience(d); }
 				else if (tab === 'content') { renderContent(d); }
+				else if (tab === 'goals') { renderGoals(d); }
 				else { renderDashboard(d); }
 			})
 			.catch(function () {

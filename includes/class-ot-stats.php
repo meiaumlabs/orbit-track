@@ -37,6 +37,10 @@ class OT_Stats {
 			'devices'    => self::by_col( 'device_type', $from, $to ),
 			'browsers'   => self::by_col( 'browser', $from, $to, 8 ),
 			'os'         => self::by_col( 'os', $from, $to, 8 ),
+			'outbound'   => self::outbound_links( $from, $to, 15 ),
+			'outhosts'   => self::outbound_hosts( $from, $to, 10 ),
+			'goals'      => OT_Goals::report( $from, $to ),
+			'worldmap'   => self::world_map( $from, $to ),
 		);
 	}
 
@@ -295,6 +299,140 @@ class OT_Stats {
 
 		return array_map( function ( $r ) {
 			return array( 'label' => $r['label'], 'sessions' => (int) $r['sessions'] );
+		}, $rows );
+	}
+
+	/** Top links de saída (URL completa) do período. */
+	public static function outbound_links( $from, $to, $limit = 15 ) {
+		global $wpdb;
+		$o = OT_DB::outbound_table();
+
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT target_url, target_host, COUNT(*) AS clicks, COUNT(DISTINCT session_uid) AS sessions
+			 FROM {$o} WHERE created_at BETWEEN %s AND %s AND target_url <> ''
+			 GROUP BY target_url ORDER BY clicks DESC LIMIT %d",
+			$from, $to, $limit
+		), ARRAY_A );
+
+		return array_map( function ( $r ) {
+			return array(
+				'url'      => $r['target_url'],
+				'host'     => $r['target_host'],
+				'clicks'   => (int) $r['clicks'],
+				'sessions' => (int) $r['sessions'],
+			);
+		}, $rows );
+	}
+
+	/** Domínios de saída mais clicados (agrupado por host). */
+	public static function outbound_hosts( $from, $to, $limit = 10 ) {
+		global $wpdb;
+		$o = OT_DB::outbound_table();
+
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT target_host AS label, COUNT(*) AS clicks
+			 FROM {$o} WHERE created_at BETWEEN %s AND %s AND target_host <> ''
+			 GROUP BY target_host ORDER BY clicks DESC LIMIT %d",
+			$from, $to, $limit
+		), ARRAY_A );
+
+		return array_map( function ( $r ) {
+			return array( 'label' => $r['label'], 'sessions' => (int) $r['clicks'] );
+		}, $rows );
+	}
+
+	/** Sessões por país no formato { cc: total } para o mapa-múndi. */
+	public static function world_map( $from, $to ) {
+		global $wpdb;
+		$s = OT_DB::sessions_table();
+
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT country_code AS cc, COUNT(*) AS sessions
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND country_code <> ''
+			 GROUP BY country_code ORDER BY sessions DESC",
+			$from, $to
+		), ARRAY_A );
+
+		$out = array();
+		foreach ( $rows as $r ) {
+			$out[] = array( 'cc' => strtoupper( $r['cc'] ), 'sessions' => (int) $r['sessions'] );
+		}
+		return $out;
+	}
+
+	/** Quantos visitantes estão online agora (últimos N minutos). */
+	public static function online_now( $minutes = 5 ) {
+		global $wpdb;
+		$s      = OT_DB::sessions_table();
+		// last_seen é gravado em hora local do site; usa o mesmo referencial no corte.
+		$cutoff = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( (int) $minutes * MINUTE_IN_SECONDS ) );
+
+		return (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM {$s} WHERE last_seen >= %s",
+			$cutoff
+		) );
+	}
+
+	/**
+	 * Log de acessos visita-a-visita (recurso "Access log" do SlimStat).
+	 *
+	 * Cada linha é um pageview com o contexto da sessão (origem, país, dispositivo,
+	 * navegador, SO). Ordenado do mais recente para o mais antigo.
+	 *
+	 * @param int    $limit  Máximo de linhas.
+	 * @param int    $offset Deslocamento para paginação.
+	 * @param string $since  (Opcional) só hits com id maior que este (para o modo ao vivo).
+	 * @return array
+	 */
+	public static function access_log( $limit = 30, $offset = 0, $since = 0 ) {
+		global $wpdb;
+		$h = OT_DB::hits_table();
+		$s = OT_DB::sessions_table();
+
+		$limit  = min( 200, max( 1, (int) $limit ) );
+		$offset = max( 0, (int) $offset );
+		$since  = max( 0, (int) $since );
+
+		$where = '1=1';
+		$args  = array();
+		if ( $since > 0 ) {
+			$where  = 'h.id > %d';
+			$args[] = $since;
+		}
+
+		$sql = "SELECT h.id, h.created_at, h.path, h.title, h.channel, h.device_type, h.country_code,
+		               h.is_entry, h.time_on_page, h.referrer,
+		               s.browser, s.os, s.country, s.city, s.is_new_visitor
+		        FROM {$h} h
+		        LEFT JOIN {$s} s ON s.session_uid = h.session_uid
+		        WHERE {$where}
+		        ORDER BY h.id DESC
+		        LIMIT %d OFFSET %d";
+		$args[] = $limit;
+		$args[] = $offset;
+
+		$rows   = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
+		$labels = OT_Source::channel_labels();
+
+		return array_map( function ( $r ) use ( $labels ) {
+			return array(
+				'id'          => (int) $r['id'],
+				'time'        => $r['created_at'],
+				'path'        => $r['path'],
+				'title'       => $r['title'] ? $r['title'] : $r['path'],
+				'channel'     => $r['channel'],
+				'channel_label' => isset( $labels[ $r['channel'] ] ) ? $labels[ $r['channel'] ] : $r['channel'],
+				'device'      => $r['device_type'],
+				'browser'     => $r['browser'],
+				'os'          => $r['os'],
+				'cc'          => $r['country_code'] ? $r['country_code'] : '',
+				'country'     => $r['country'],
+				'city'        => $r['city'],
+				'referrer'    => $r['referrer'],
+				'is_entry'    => (int) $r['is_entry'],
+				'is_new'      => (int) $r['is_new_visitor'],
+				'time_on_page'=> (int) $r['time_on_page'],
+			);
 		}, $rows );
 	}
 

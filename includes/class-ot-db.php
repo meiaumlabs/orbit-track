@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class OT_DB {
 
 	/** Incremente ao alterar o schema para disparar migração. */
-	const DB_VERSION = '1.0.0';
+	const DB_VERSION = '1.1.0';
 
 	/** @return string Nome da tabela de sessões (visitas). */
 	public static function sessions_table() {
@@ -24,6 +24,12 @@ class OT_DB {
 	public static function hits_table() {
 		global $wpdb;
 		return $wpdb->prefix . 'ot_hits';
+	}
+
+	/** @return string Nome da tabela de cliques em links de saída (outbound). */
+	public static function outbound_table() {
+		global $wpdb;
+		return $wpdb->prefix . 'ot_outbound';
 	}
 
 	/**
@@ -97,8 +103,27 @@ class OT_DB {
 			KEY created_at (created_at)
 		) {$charset};";
 
+		// Uma linha por clique em link externo (link de saída).
+		$outbound = self::outbound_table();
+		$sql_outbound = "CREATE TABLE {$outbound} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			session_uid CHAR(36) NOT NULL,
+			visitor_hash CHAR(40) NOT NULL,
+			target_url VARCHAR(255) NOT NULL DEFAULT '',
+			target_host VARCHAR(191) NOT NULL DEFAULT '',
+			from_path VARCHAR(191) NOT NULL DEFAULT '',
+			channel VARCHAR(30) NOT NULL DEFAULT 'direct',
+			country_code CHAR(2) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			KEY session_uid (session_uid),
+			KEY target_host (target_host),
+			KEY created_at (created_at)
+		) {$charset};";
+
 		dbDelta( $sql_sessions );
 		dbDelta( $sql_hits );
+		dbDelta( $sql_outbound );
 	}
 
 	/**
@@ -112,10 +137,12 @@ class OT_DB {
 		}
 		$sessions = self::sessions_table();
 		$hits     = self::hits_table();
+		$outbound = self::outbound_table();
 		$cutoff   = gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
 
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$sessions} WHERE started_at < %s", $cutoff ) );
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$hits} WHERE created_at < %s", $cutoff ) );
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$outbound} WHERE created_at < %s", $cutoff ) );
 	}
 
 	/**
@@ -125,5 +152,6 @@ class OT_DB {
 		global $wpdb;
 		$wpdb->query( 'TRUNCATE TABLE ' . self::sessions_table() );
 		$wpdb->query( 'TRUNCATE TABLE ' . self::hits_table() );
+		$wpdb->query( 'TRUNCATE TABLE ' . self::outbound_table() );
 	}
 }

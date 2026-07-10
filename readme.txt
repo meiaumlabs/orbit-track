@@ -4,7 +4,7 @@ Tags: analytics, tracking, utm, estatisticas, visitantes, origem, dispositivos
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,10 @@ O **Orbit Track** é um plugin de analytics self-hosted que mapeia todos os aces
 * **Regiões mais acessadas**: país, estado/região e cidade (geolocalização por IP).
 * **Tempo de permanência** por página e duração da sessão, com taxa de rejeição e páginas por sessão.
 * **Série temporal** de sessões e visualizações.
+* **Log de acessos ao vivo**: acompanhe cada visita no instante em que acontece — página, canal, país/cidade, dispositivo, navegador e SO — com contador de "online agora" e atualização automática.
+* **Mapa-múndi de visitantes**: veja de onde vêm seus acessos num mapa interativo, colorido pela intensidade de sessões por país.
+* **Links de saída (outbound)**: registre os cliques em links externos que os visitantes seguem ao sair do site, com os domínios mais clicados.
+* **Metas de conversão**: defina metas pela URL da página (ex.: `/obrigado`) e acompanhe conversões, visitantes e taxa de conversão — sem limite de metas.
 
 **Privacidade e desempenho:**
 
@@ -51,6 +55,13 @@ Sim. A captura acontece via um beacon JavaScript executado no navegador, então 
 Não para rastreamento. O identificador de visitante fica no `localStorage` do navegador e é anonimizado por hash no servidor.
 
 == Changelog ==
+
+= 1.1.0 =
+* Novo: **Log de acessos ao vivo** (aba "Ao vivo") com visão visita-a-visita, contador de visitantes online e atualização automática.
+* Novo: **Mapa-múndi de visitantes** na aba "Público", colorindo os países pela quantidade de sessões.
+* Novo: **Rastreamento de links de saída** (outbound) com relatório de links e domínios externos mais clicados, na aba "Conteúdo".
+* Novo: **Metas de conversão** (aba "Metas") por correspondência de URL, com conversões, visitantes e taxa de conversão — sem limite de metas.
+* Recursos inspirados no SlimStat, mantendo tudo self-hosted, cookieless e sem serviços pagos.
 
 = 1.0.0 =
 * Versão inicial: captura de sessões e pageviews, atribuição de canal (orgânico/pago/social/e-mail/referência), detecção de dispositivo/navegador/SO, geolocalização por IP com cache, tempo de permanência, painel com KPIs, gráficos e relatórios por aquisição, público e conteúdo.

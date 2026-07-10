@@ -214,6 +214,57 @@ class OT_Tracker {
 	}
 
 	/**
+	 * Registra um clique em link de saída (link externo seguido pelo visitante).
+	 *
+	 * @param array $in Dados vindos do beacon.
+	 * @return array{ok:bool}
+	 */
+	public static function record_outbound( array $in ) {
+		global $wpdb;
+
+		$target = isset( $in['target'] ) ? esc_url_raw( $in['target'] ) : '';
+		$host   = OT_Source::host( $target );
+		if ( ! $target || ! $host ) {
+			return array( 'ok' => false );
+		}
+
+		// Ignora cliques que apontam para o próprio site.
+		if ( OT_Source::host( home_url( '/' ) ) === $host ) {
+			return array( 'ok' => false );
+		}
+
+		$session_uid = self::sanitize_uid( isset( $in['sid'] ) ? $in['sid'] : '' );
+		$visitor_uid = self::sanitize_uid( isset( $in['vid'] ) ? $in['vid'] : '' );
+		if ( ! $session_uid || ! $visitor_uid ) {
+			return array( 'ok' => false );
+		}
+
+		$salt         = (string) get_option( 'ot_visitor_salt' );
+		$visitor_hash = hash( 'sha1', $visitor_uid . '|' . $salt );
+		$from_path    = self::path_from_url( isset( $in['from'] ) ? esc_url_raw( $in['from'] ) : '' );
+
+		// Herda canal e país da sessão de origem, quando existir.
+		$sessions = OT_DB::sessions_table();
+		$sess = $wpdb->get_row( $wpdb->prepare(
+			"SELECT channel, country_code FROM {$sessions} WHERE session_uid = %s",
+			$session_uid
+		) );
+
+		$wpdb->insert( OT_DB::outbound_table(), array(
+			'session_uid'  => $session_uid,
+			'visitor_hash' => $visitor_hash,
+			'target_url'   => substr( $target, 0, 255 ),
+			'target_host'  => $host,
+			'from_path'    => $from_path,
+			'channel'      => $sess ? $sess->channel : 'direct',
+			'country_code' => $sess ? $sess->country_code : '',
+			'created_at'   => current_time( 'mysql' ),
+		) );
+
+		return array( 'ok' => true );
+	}
+
+	/**
 	 * Monta os parâmetros da landing page: query da URL + overrides do beacon.
 	 */
 	private static function parse_landing_params( $url, array $in ) {

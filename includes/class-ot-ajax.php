@@ -17,9 +17,13 @@ class OT_Ajax {
 		add_action( 'wp_ajax_nopriv_ot_hit', array( __CLASS__, 'hit' ) );
 		add_action( 'wp_ajax_ot_ping', array( __CLASS__, 'ping' ) );
 		add_action( 'wp_ajax_nopriv_ot_ping', array( __CLASS__, 'ping' ) );
+		add_action( 'wp_ajax_ot_out', array( __CLASS__, 'outbound' ) );
+		add_action( 'wp_ajax_nopriv_ot_out', array( __CLASS__, 'outbound' ) );
 
 		// Painel (somente admin).
 		add_action( 'wp_ajax_ot_report', array( __CLASS__, 'report' ) );
+		add_action( 'wp_ajax_ot_log', array( __CLASS__, 'log' ) );
+		add_action( 'wp_ajax_ot_save_goals', array( __CLASS__, 'save_goals' ) );
 		add_action( 'wp_ajax_ot_save_settings', array( __CLASS__, 'save_settings' ) );
 		add_action( 'wp_ajax_ot_reset_data', array( __CLASS__, 'reset_data' ) );
 	}
@@ -43,6 +47,40 @@ class OT_Ajax {
 		$data = self::raw_body();
 		OT_Tracker::record_engagement( $data );
 		wp_send_json_success();
+	}
+
+	/** Registra um clique em link de saída vindo do beacon. */
+	public static function outbound() {
+		check_ajax_referer( 'ot_track', 'nonce' );
+
+		$data = self::raw_body();
+		OT_Tracker::record_outbound( $data );
+		wp_send_json_success();
+	}
+
+	/** Devolve o log de acessos ao vivo + contagem de online agora. */
+	public static function log() {
+		self::guard_admin();
+
+		$limit  = isset( $_POST['limit'] ) ? (int) $_POST['limit'] : 30;
+		$offset = isset( $_POST['offset'] ) ? (int) $_POST['offset'] : 0;
+		$since  = isset( $_POST['since'] ) ? (int) $_POST['since'] : 0;
+
+		wp_send_json_success( array(
+			'rows'   => OT_Stats::access_log( $limit, $offset, $since ),
+			'online' => OT_Stats::online_now(),
+		) );
+	}
+
+	/** Cria/atualiza as metas de conversão. */
+	public static function save_goals() {
+		self::guard_admin();
+
+		$input = isset( $_POST['goals'] ) && is_array( $_POST['goals'] )
+			? wp_unslash( $_POST['goals'] )
+			: array();
+		$saved = OT_Goals::save( $input );
+		wp_send_json_success( $saved );
 	}
 
 	/** Devolve os dados agregados para o painel. */

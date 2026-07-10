@@ -35,14 +35,19 @@ class OT_Admin {
 			return;
 		}
 		wp_enqueue_style( 'ot-fonts', 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap', array(), OT_VERSION );
+		// Mapa-múndi de visitantes (jsVectorMap — MIT, sem custos).
+		wp_enqueue_style( 'ot-jsvectormap', 'https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css', array(), '1.5.3' );
 		wp_enqueue_style( 'ot-app', OT_URL . 'admin/css/app.css', array(), OT_VERSION );
 		wp_enqueue_script( 'ot-chart', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', array(), '4.4.1', true );
-		wp_enqueue_script( 'ot-app', OT_URL . 'admin/js/app.js', array( 'ot-chart' ), OT_VERSION, true );
+		wp_enqueue_script( 'ot-jsvectormap', 'https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js', array(), '1.5.3', true );
+		wp_enqueue_script( 'ot-jsvectormap-world', 'https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js', array( 'ot-jsvectormap' ), '1.5.3', true );
+		wp_enqueue_script( 'ot-app', OT_URL . 'admin/js/app.js', array( 'ot-chart', 'ot-jsvectormap-world' ), OT_VERSION, true );
 
 		wp_localize_script( 'ot-app', 'OT', array(
-			'ajax'     => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( 'ot_admin' ),
-			'channels' => OT_Source::channel_labels(),
+			'ajax'      => admin_url( 'admin-ajax.php' ),
+			'nonce'     => wp_create_nonce( 'ot_admin' ),
+			'channels'  => OT_Source::channel_labels(),
+			'goals'     => OT_Goals::all(),
 			'i18n'     => array(
 				'loading'  => __( 'Carregando…', 'orbit-track' ),
 				'error'    => __( 'Erro ao carregar os dados.', 'orbit-track' ),
@@ -50,7 +55,11 @@ class OT_Admin {
 				'sessions' => __( 'Sessões', 'orbit-track' ),
 				'pageviews'=> __( 'Visualizações', 'orbit-track' ),
 				'saved'    => __( 'Configurações salvas.', 'orbit-track' ),
+				'goalsSaved' => __( 'Metas salvas.', 'orbit-track' ),
 				'confirmReset' => __( 'Apagar TODOS os dados de tracking? Esta ação não pode ser desfeita.', 'orbit-track' ),
+				'online'   => __( 'online agora', 'orbit-track' ),
+				'live'     => __( 'Ao vivo', 'orbit-track' ),
+				'paused'   => __( 'Pausado', 'orbit-track' ),
 			),
 		) );
 	}
@@ -84,15 +93,18 @@ class OT_Admin {
 
 			<nav class="ot-tabs">
 				<a class="ot-tab <?php echo 'dashboard' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=dashboard' ) ); ?>"><?php esc_html_e( 'Painel', 'orbit-track' ); ?></a>
+				<a class="ot-tab <?php echo 'live' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=live' ) ); ?>"><?php esc_html_e( 'Ao vivo', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'acquisition' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=acquisition' ) ); ?>"><?php esc_html_e( 'Aquisição', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'audience' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=audience' ) ); ?>"><?php esc_html_e( 'Público', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'content' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=content' ) ); ?>"><?php esc_html_e( 'Conteúdo', 'orbit-track' ); ?></a>
+				<a class="ot-tab <?php echo 'goals' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=goals' ) ); ?>"><?php esc_html_e( 'Metas', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'settings' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=settings' ) ); ?>"><?php esc_html_e( 'Configurações', 'orbit-track' ); ?></a>
 			</nav>
 
 			<?php if ( 'settings' === $tab ) : ?>
 				<?php self::render_settings(); ?>
 			<?php else : ?>
+				<?php if ( 'live' !== $tab ) : ?>
 				<div class="ot-toolbar">
 					<div class="ot-range" role="tablist">
 						<button class="ot-range-btn" data-days="7">7d</button>
@@ -106,6 +118,7 @@ class OT_Admin {
 						<button class="ot-btn ot-btn-ghost" id="ot-apply-dates"><?php esc_html_e( 'Aplicar', 'orbit-track' ); ?></button>
 					</div>
 				</div>
+				<?php endif; ?>
 				<div id="ot-view" data-tab="<?php echo esc_attr( $tab ); ?>">
 					<div class="ot-loading"><?php esc_html_e( 'Carregando…', 'orbit-track' ); ?></div>
 				</div>

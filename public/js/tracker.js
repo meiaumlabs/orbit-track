@@ -8,9 +8,13 @@
 (function () {
 	'use strict';
 
-	if (typeof OrbitTrack === 'undefined' || !OrbitTrack.endpoint) {
+	if (typeof OrbitTrack === 'undefined' || (!OrbitTrack.rest && !OrbitTrack.endpoint)) {
 		return;
 	}
+
+	// Transporte primário: rota REST (resistente a ad-blocker e a nonce de
+	// cache). Sem ela, usa admin-ajax diretamente. Ver OT_Ajax::register_rest().
+	var REST = OrbitTrack.rest || '';
 
 	// Respeita Do Not Track quando a opção estiver ligada.
 	if (OrbitTrack.respectDnt && (navigator.doNotTrack === '1' || window.doNotTrack === '1')) {
@@ -98,7 +102,38 @@
 	var pinged = false;
 
 	// Envia o hit no carregamento e guarda o ID retornado para o ping de tempo.
+	// Preferência: rota REST (JSON). Só cai para admin-ajax se a REST falhar na
+	// REDE (.catch) — nunca quando a REST responde ok:false (ex.: bot filtrado),
+	// para não contar o mesmo pageview duas vezes.
 	function sendHit() {
+		if (REST) {
+			var json = {};
+			for (var key in payload) {
+				if (Object.prototype.hasOwnProperty.call(payload, key)) {
+					json[key] = payload[key];
+				}
+			}
+			json.t = 'hit';
+			fetch(REST, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(json),
+				keepalive: true
+			})
+				.then(function (r) { return r.json(); })
+				.then(function (res) {
+					if (res && res.hit) { hitId = res.hit; }
+				})
+				.catch(function () { sendHitAjax(); });
+			return;
+		}
+		sendHitAjax();
+	}
+
+	// Fallback: hit via admin-ajax (form-encoded, com nonce).
+	function sendHitAjax() {
+		if (!OrbitTrack.endpoint) { return; }
 		var body = new URLSearchParams();
 		body.append('action', 'ot_hit');
 		for (var key in payload) {
@@ -122,6 +157,35 @@
 			.catch(function () {});
 	}
 
+	// Envia um beacon de descarregamento (ping/out) preferindo a rota REST (JSON);
+	// cai para admin-ajax (form-encoded) quando a REST não está disponível.
+	function beacon(json, ajaxBody) {
+		var sent = false;
+		if (REST && navigator.sendBeacon) {
+			try {
+				var blob = new Blob([JSON.stringify(json)], { type: 'application/json' });
+				sent = navigator.sendBeacon(REST, blob);
+			} catch (e) {}
+		}
+		if (sent) { return; }
+		if (!OrbitTrack.endpoint) { return; }
+		if (navigator.sendBeacon) {
+			try {
+				var b2 = new Blob([ajaxBody], { type: 'application/x-www-form-urlencoded' });
+				sent = navigator.sendBeacon(OrbitTrack.endpoint, b2);
+			} catch (e) {}
+		}
+		if (!sent) {
+			fetch(OrbitTrack.endpoint, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: ajaxBody,
+				keepalive: true
+			}).catch(function () {});
+		}
+	}
+
 	// Acumula tempo de engajamento apenas com a aba visível.
 	function tick() {
 		if (document.visibilityState === 'visible') {
@@ -137,27 +201,13 @@
 		var seconds = Math.round(engagedMs / 1000);
 		if (seconds < 1) { seconds = Math.round((Date.now() - landedAt) / 1000); }
 
-		var data = 'action=ot_ping&nonce=' + encodeURIComponent(OrbitTrack.nonce) +
-			'&hit=' + encodeURIComponent(hitId) +
-			'&sid=' + encodeURIComponent(sid) +
-			'&seconds=' + encodeURIComponent(seconds);
-
-		var sent = false;
-		if (navigator.sendBeacon) {
-			try {
-				var blob = new Blob([data], { type: 'application/x-www-form-urlencoded' });
-				sent = navigator.sendBeacon(OrbitTrack.endpoint, blob);
-			} catch (e) {}
-		}
-		if (!sent) {
-			fetch(OrbitTrack.endpoint, {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: data,
-				keepalive: true
-			}).catch(function () {});
-		}
+		beacon(
+			{ t: 'ping', nonce: OrbitTrack.nonce, hit: hitId, sid: sid, seconds: seconds },
+			'action=ot_ping&nonce=' + encodeURIComponent(OrbitTrack.nonce) +
+				'&hit=' + encodeURIComponent(hitId) +
+				'&sid=' + encodeURIComponent(sid) +
+				'&seconds=' + encodeURIComponent(seconds)
+		);
 	}
 
 	// Rastreia cliques em links de saída (links para domínios externos).
@@ -167,26 +217,14 @@
 	var HOST = siteHost();
 
 	function sendOutbound(target) {
-		var data = 'action=ot_out&nonce=' + encodeURIComponent(OrbitTrack.nonce) +
-			'&sid=' + encodeURIComponent(sid) +
-			'&vid=' + encodeURIComponent(vid) +
-			'&from=' + encodeURIComponent(window.location.href) +
-			'&target=' + encodeURIComponent(target);
-
-		var sent = false;
-		if (navigator.sendBeacon) {
-			try {
-				var blob = new Blob([data], { type: 'application/x-www-form-urlencoded' });
-				sent = navigator.sendBeacon(OrbitTrack.endpoint, blob);
-			} catch (e) {}
-		}
-		if (!sent) {
-			fetch(OrbitTrack.endpoint, {
-				method: 'POST', credentials: 'same-origin',
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: data, keepalive: true
-			}).catch(function () {});
-		}
+		beacon(
+			{ t: 'out', nonce: OrbitTrack.nonce, sid: sid, vid: vid, from: window.location.href, target: target },
+			'action=ot_out&nonce=' + encodeURIComponent(OrbitTrack.nonce) +
+				'&sid=' + encodeURIComponent(sid) +
+				'&vid=' + encodeURIComponent(vid) +
+				'&from=' + encodeURIComponent(window.location.href) +
+				'&target=' + encodeURIComponent(target)
+		);
 	}
 
 	document.addEventListener('click', function (ev) {

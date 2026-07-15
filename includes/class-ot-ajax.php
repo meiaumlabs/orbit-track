@@ -12,13 +12,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class OT_Ajax {
 
 	public static function init() {
-		// Beacon público (logados e não logados).
+		// Beacon público (logados e não logados) — via admin-ajax (fallback).
 		add_action( 'wp_ajax_ot_hit', array( __CLASS__, 'hit' ) );
 		add_action( 'wp_ajax_nopriv_ot_hit', array( __CLASS__, 'hit' ) );
 		add_action( 'wp_ajax_ot_ping', array( __CLASS__, 'ping' ) );
 		add_action( 'wp_ajax_nopriv_ot_ping', array( __CLASS__, 'ping' ) );
 		add_action( 'wp_ajax_ot_out', array( __CLASS__, 'outbound' ) );
 		add_action( 'wp_ajax_nopriv_ot_out', array( __CLASS__, 'outbound' ) );
+
+		// Beacon público (transporte primário) — rota REST resistente a
+		// ad-blocker e a nonce expirado em cache. Ver register_rest().
+		add_action( 'rest_api_init', array( __CLASS__, 'register_rest' ) );
 
 		// Painel (somente admin).
 		add_action( 'wp_ajax_ot_report', array( __CLASS__, 'report' ) );
@@ -56,6 +60,65 @@ class OT_Ajax {
 		$data = self::raw_body();
 		OT_Tracker::record_outbound( $data );
 		wp_send_json_success();
+	}
+
+	/**
+	 * Registra a rota REST pública de coleta.
+	 *
+	 * Motivação (alinhamento com o SlimStat / precisão de contagem):
+	 *   - Ad-blockers: `admin-ajax.php?action=ot_hit` é alvo clássico de
+	 *     uBlock/EasyPrivacy; os hits são bloqueados no navegador e nunca chegam
+	 *     ao PHP → o Orbit Track contava MENOS que o SlimStat. Uma rota sob
+	 *     `/wp-json/` com slug neutro (sem "action=track") raramente é filtrada.
+	 *     O SlimStat coleta exatamente assim (rota `slimstat/v1/hit`).
+	 *   - Cache de página: o beacon antigo exigia nonce (`check_ajax_referer`).
+	 *     Em páginas servidas de cache para visitantes anônimos, o nonce embutido
+	 *     no HTML expira (12–24h) e o hit é rejeitado silenciosamente → perda de
+	 *     contagem. O SlimStat usa `permission_callback => __return_true` e NÃO
+	 *     exige nonce no endpoint de tracking, justamente para sobreviver ao cache.
+	 *     Registrar um pageview não é ação sensível a CSRF (o pior caso é alguém
+	 *     inflar a própria analytics); os dados continuam validados/sanitizados em
+	 *     OT_Tracker::record_pageview(). Adotamos o mesmo trade-off aqui.
+	 *
+	 * O caminho admin-ajax (com nonce) é mantido como fallback para quando a
+	 * rota REST estiver indisponível.
+	 */
+	public static function register_rest() {
+		register_rest_route( 'orbit-track/v1', '/collect', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'rest_collect' ),
+			'permission_callback' => '__return_true',
+		) );
+	}
+
+	/**
+	 * Handler REST unificado do beacon. Despacha pelo campo "t" (hit|ping|out).
+	 *
+	 * @param WP_REST_Request $request Requisição REST.
+	 * @return WP_REST_Response
+	 */
+	public static function rest_collect( WP_REST_Request $request ) {
+		$data = $request->get_json_params();
+		if ( ! is_array( $data ) ) {
+			$data = $request->get_params();
+		}
+
+		$type = isset( $data['t'] ) ? sanitize_key( $data['t'] ) : 'hit';
+
+		if ( 'ping' === $type ) {
+			OT_Tracker::record_engagement( $data );
+			return rest_ensure_response( array( 'ok' => true ) );
+		}
+		if ( 'out' === $type ) {
+			OT_Tracker::record_outbound( $data );
+			return rest_ensure_response( array( 'ok' => true ) );
+		}
+
+		$res = OT_Tracker::record_pageview( $data );
+		return rest_ensure_response( array(
+			'ok'  => ! empty( $res['ok'] ),
+			'hit' => isset( $res['hit'] ) ? (int) $res['hit'] : 0,
+		) );
 	}
 
 	/** Devolve o log de acessos ao vivo + contagem de online agora. */

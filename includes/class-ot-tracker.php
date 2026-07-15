@@ -30,6 +30,10 @@ class OT_Tracker {
 
 		wp_enqueue_script( 'ot-tracker', OT_URL . 'public/js/tracker.js', array(), OT_VERSION, true );
 		wp_localize_script( 'ot-tracker', 'OrbitTrack', array(
+			// Transporte primário: rota REST (resistente a ad-blocker e a nonce
+			// expirado em cache). O beacon cai para 'endpoint' (admin-ajax) só se
+			// a rota REST falhar na rede. Ver OT_Ajax::register_rest().
+			'rest'      => esc_url_raw( rest_url( 'orbit-track/v1/collect' ) ),
 			'endpoint'  => admin_url( 'admin-ajax.php' ),
 			'nonce'     => wp_create_nonce( 'ot_track' ),
 			'postId'    => (int) ( is_singular() ? get_queried_object_id() : 0 ),

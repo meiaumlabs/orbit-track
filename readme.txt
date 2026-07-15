@@ -4,7 +4,7 @@ Tags: analytics, tracking, utm, estatisticas, visitantes, origem, dispositivos
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,6 +55,10 @@ Sim. A captura acontece via um beacon JavaScript executado no navegador, então 
 Não para rastreamento. O identificador de visitante fica no `localStorage` do navegador e é anonimizado por hash no servidor.
 
 == Changelog ==
+
+= 1.2.0 =
+* Melhoria: **UI/UX redesenhada** — painel administrativo com novo visual, tipografia e layout modernizados.
+* Melhoria: **Coleta alinhada ao SlimStat** — precisão de rastreamento equivalente ao SlimStat, mantendo arquitetura self-hosted, cookieless e sem serviços pagos.
 
 = 1.1.0 =
 * Novo: **Log de acessos ao vivo** (aba "Ao vivo") com visão visita-a-visita, contador de visitantes online e atualização automática.

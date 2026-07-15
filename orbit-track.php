@@ -3,7 +3,7 @@
  * Plugin Name:       Orbit Track — Tracking Orgânico & Anúncios
  * Plugin URI:        https://61labs.com.br/orbit-track
  * Description:       Tracking profissional e independente para WordPress. Mapeia todos os acessos do site — origem (orgânico, anúncios, social, e-mail, referência), páginas visitadas, tempo de permanência, região (país/estado/cidade), dispositivo, navegador e sistema operacional — direto no painel, sem depender de serviços externos. Compatível com cache e cookieless. Desenvolvido pela 61 Labs.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            61 Labs
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OT_VERSION', '1.1.0' );
+define( 'OT_VERSION', '1.2.0' );
 define( 'OT_FILE', __FILE__ );
 define( 'OT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OT_URL', plugin_dir_url( __FILE__ ) );

@@ -347,16 +347,136 @@
 	function logRow(r) {
 		var when = (r.time || '').slice(11, 19);
 		var place = (flag(r.cc) + ' ' + esc([r.city, r.country].filter(Boolean).join(', '))).trim();
+
+		// Tags de sessão.
 		var tags = '';
-		if (r.is_entry) { tags += '<span class="ot-tag ot-tag-entry">entrada</span>'; }
-		tags += r.is_new ? '<span class="ot-tag ot-tag-new">novo</span>' : '<span class="ot-tag">recorrente</span>';
-		return '<tr data-id="' + r.id + '">' +
-			'<td class="ot-log-time">' + esc(when) + '</td>' +
+		if (r.is_bot)     { tags += '<span class="ot-tag ot-tag-bot">bot</span>'; }
+		if (r.is_private) { tags += '<span class="ot-tag ot-tag-private">privado</span>'; }
+		if (r.is_entry)   { tags += '<span class="ot-tag ot-tag-entry">entrada</span>'; }
+		if (!r.is_bot) {
+			tags += r.is_new ? '<span class="ot-tag ot-tag-new">novo</span>' : '<span class="ot-tag">recorrente</span>';
+		}
+
+		// Origem/referrer: mostra o domínio quando relevante.
+		var sourceLabel = '';
+		var showSource = r.referrer || r.source;
+		if (showSource && r.channel !== 'direct' && r.channel !== 'internal') {
+			sourceLabel = '<span class="ot-log-source">' + esc(showSource) + '</span>';
+		}
+
+		// IP (exibido somente quando store_ip está ativo e o servidor devolveu o campo).
+		var ipCell = '';
+		if (r.ip) {
+			ipCell = '<span class="ot-log-ip">' + esc(r.ip) + '</span>';
+		} else if (!OT.storeIp) {
+			ipCell = '<span class="ot-log-ip ot-log-ip--off">—</span>';
+		}
+
+		// Botão de bloqueio.
+		var blockBtn = '';
+		if (OT.storeIp && r.session_db_id) {
+			blockBtn = '<button class="ot-btn-block" data-sid="' + r.session_db_id + '" title="' + esc(OT.i18n.block) + '">⊘</button>';
+		}
+
+		// ID parcial da sessão.
+		var sidBadge = r.sid ? '<span class="ot-log-sid">' + esc(r.sid) + '</span>' : '';
+
+		return '<tr data-id="' + r.id + '" class="' + (r.is_bot ? 'ot-row-bot' : '') + '">' +
+			'<td class="ot-log-time">' + esc(when) + sidBadge + '</td>' +
 			'<td><span class="ot-page-title">' + esc(r.title) + '</span><span class="ot-page-path">' + esc(r.path) + '</span>' + tags + '</td>' +
-			'<td><span class="ot-chan ot-chan-' + esc(r.channel) + '">' + esc(r.channel_label) + '</span></td>' +
+			'<td><span class="ot-chan ot-chan-' + esc(r.channel) + '">' + esc(r.channel_label) + '</span>' + sourceLabel + '</td>' +
 			'<td>' + place + '</td>' +
 			'<td>' + esc(deviceLabel(r.device)) + '<span class="ot-log-ua">' + esc([r.browser, r.os].filter(Boolean).join(' · ')) + '</span></td>' +
+			'<td class="ot-log-ip-cell">' + ipCell + blockBtn + '</td>' +
 			'</tr>';
+	}
+
+	/* ── Blacklist ───────────────────────────────────────────────────── */
+
+	function blockIp(sessionDbId, btn) {
+		if (!OT.storeIp) { alert(OT.i18n.noIpStored); return; }
+		if (!window.confirm(OT.i18n.confirmBlock)) { return; }
+		btn.disabled = true;
+		post('ot_blocklist_add', { session_db_id: sessionDbId }).then(function (res) {
+			if (res && res.success) {
+				btn.textContent = '✓';
+				btn.classList.add('is-blocked');
+				btn.disabled = true;
+			} else {
+				btn.disabled = false;
+				alert(OT.i18n.error);
+			}
+		}).catch(function () { btn.disabled = false; });
+	}
+
+	function renderSecurity() {
+		view.innerHTML = loadingHtml();
+		post('ot_blocklist_get', {}).then(function (res) {
+			if (!res || !res.success) { throw new Error('bad'); }
+			drawSecurity(res.data.entries || []);
+		}).catch(function () {
+			view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + esc(OT.i18n.error) + '</p></div>';
+		});
+	}
+
+	function drawSecurity(entries) {
+		var note = !OT.storeIp
+			? '<div class="ot-alert ot-alert-warn">' + esc(OT.i18n.noIpStored) + '</div>'
+			: '';
+
+		var manualAdd = '<div class="ot-card ot-settings"><h3>Adicionar IP manualmente</h3>' +
+			'<div class="ot-blocklist-add-row">' +
+			'<input type="text" id="ot-bl-ip" placeholder="Ex.: 203.0.113.42" class="ot-input-text">' +
+			'<input type="text" id="ot-bl-reason" placeholder="Motivo (opcional)" class="ot-input-text">' +
+			'<button class="ot-btn ot-btn-danger" id="ot-bl-add">Bloquear</button>' +
+			'<span class="ot-save-msg" id="ot-bl-msg"></span>' +
+			'</div></div>';
+
+		var rows = entries.map(function (e) {
+			return '<tr><td class="ot-bl-ip">' + esc(e.ip_address) + '</td>' +
+				'<td>' + esc(e.reason || '—') + '</td>' +
+				'<td>' + esc((e.added_at || '').slice(0, 16)) + '</td>' +
+				'<td><button class="ot-btn ot-btn-danger ot-bl-remove" data-id="' + esc(e.id) + '">Remover</button></td></tr>';
+		}).join('');
+
+		var table = entries.length
+			? '<div class="ot-card ot-card-wide"><h3>IPs bloqueados (' + entries.length + ')</h3>' +
+				'<table class="ot-table"><thead><tr><th>IP</th><th>Motivo</th><th>Bloqueado em</th><th></th></tr></thead>' +
+				'<tbody>' + rows + '</tbody></table>' +
+				'<p class="ot-muted" style="margin-top:12px">⚠ Em sites com cache de página completa (WP Rocket, LiteSpeed, etc.), o bloqueio via WordPress só se aplica a requisições não-cacheadas. Para bloqueio total, adicione uma regra no servidor (nginx/apache) ou no painel do Cloudflare.</p>' +
+				'</div>'
+			: '<div class="ot-card ot-card-wide"><p class="ot-empty">Nenhum IP bloqueado.</p></div>';
+
+		view.innerHTML = note + manualAdd + table;
+
+		var addBtn = document.getElementById('ot-bl-add');
+		if (addBtn) {
+			addBtn.addEventListener('click', function () {
+				var ip  = (document.getElementById('ot-bl-ip').value || '').trim();
+				var rsn = (document.getElementById('ot-bl-reason').value || '').trim();
+				var msg = document.getElementById('ot-bl-msg');
+				if (!ip) { if (msg) { msg.textContent = 'Digite um IP.'; msg.className = 'ot-save-msg err'; } return; }
+				addBtn.disabled = true;
+				post('ot_blocklist_add', { ip: ip, reason: rsn }).then(function (res) {
+					addBtn.disabled = false;
+					if (res && res.success) {
+						drawSecurity(res.data.entries || []);
+					} else {
+						if (msg) { msg.textContent = 'IP inválido.'; msg.className = 'ot-save-msg err'; }
+					}
+				}).catch(function () { addBtn.disabled = false; });
+			});
+		}
+
+		view.addEventListener('click', function (ev) {
+			if (ev.target && ev.target.classList.contains('ot-bl-remove')) {
+				if (!window.confirm(OT.i18n.confirmUnblock)) { return; }
+				var id = ev.target.getAttribute('data-id');
+				post('ot_blocklist_remove', { id: id }).then(function (res) {
+					if (res && res.success) { drawSecurity(res.data.entries || []); }
+				});
+			}
+		}, { once: true });
 	}
 
 	function renderLive(data) {
@@ -368,7 +488,7 @@
 			'<button class="ot-btn ot-btn-ghost" id="ot-live-toggle">' + esc(livePaused ? OT.i18n.paused : OT.i18n.live) + '</button>' +
 			'</div>' +
 			'<div class="ot-card ot-card-wide ot-log-card"><table class="ot-table ot-log-table">' +
-			'<thead><tr><th>Hora</th><th>Página</th><th>Canal</th><th>Local</th><th>Dispositivo</th></tr></thead>' +
+			'<thead><tr><th>Hora</th><th>Página</th><th>Canal / Origem</th><th>Local</th><th>Dispositivo</th><th>IP</th></tr></thead>' +
 			'<tbody id="ot-log-body">' + (body || '<tr><td colspan="5" class="ot-empty">' + esc(OT.i18n.empty) + '</td></tr>') + '</tbody>' +
 			'</table></div>';
 		view.innerHTML = html;
@@ -380,6 +500,15 @@
 				livePaused = !livePaused;
 				toggle.textContent = livePaused ? OT.i18n.paused : OT.i18n.live;
 				toggle.classList.toggle('is-live', !livePaused);
+			});
+		}
+
+		// Delegação de clique para botões de bloqueio no log.
+		var logCard = view.querySelector('.ot-log-card');
+		if (logCard) {
+			logCard.addEventListener('click', function (ev) {
+				var btn = ev.target && ev.target.closest ? ev.target.closest('.ot-btn-block') : null;
+				if (btn) { blockIp(parseInt(btn.getAttribute('data-sid'), 10), btn); }
 			});
 		}
 	}
@@ -535,6 +664,7 @@
 		var tab = view.getAttribute('data-tab') || 'dashboard';
 
 		if (tab === 'live') { startLive(); return; }
+		if (tab === 'security') { renderSecurity(); return; }
 		stopLive();
 
 		view.innerHTML = loadingHtml();
@@ -548,6 +678,7 @@
 				else if (tab === 'content')     { renderContent(d); }
 				else if (tab === 'goals')       { renderGoals(d); }
 				else                            { renderDashboard(d); }
+
 			})
 			.catch(function () {
 				view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + esc(OT.i18n.error) + '</p></div>';
@@ -596,6 +727,8 @@
 			body.append('settings[exclude_bots]',  document.getElementById('ot-exclude-bots').checked  ? 1 : 0);
 			body.append('settings[geo_enabled]',   document.getElementById('ot-geo-enabled').checked   ? 1 : 0);
 			body.append('settings[respect_dnt]',   document.getElementById('ot-respect-dnt').checked   ? 1 : 0);
+			body.append('settings[store_ip]',      document.getElementById('ot-store-ip').checked      ? 1 : 0);
+			body.append('settings[anonymize_ip]',  document.getElementById('ot-anonymize-ip').checked  ? 1 : 0);
 			body.append('settings[retention_days]',document.getElementById('ot-retention').value);
 			body.append('settings[session_timeout]',document.getElementById('ot-timeout').value);
 

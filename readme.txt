@@ -4,7 +4,7 @@ Tags: analytics, tracking, utm, estatisticas, visitantes, origem, dispositivos
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.2.1
+Stable tag: 1.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,6 +55,15 @@ Sim. A captura acontece via um beacon JavaScript executado no navegador, então 
 Não para rastreamento. O identificador de visitante fica no `localStorage` do navegador e é anonimizado por hash no servidor.
 
 == Changelog ==
+
+= 1.3.0 =
+* Novo: **Log de origem visível** — canal "Referência" e outros agora exibem o domínio de onde o visitante veio diretamente no log ao vivo.
+* Novo: **IP do visitante** — armazenamento e exibição do IP opcionais (opt-in via Configurações, padrão OFF para conformidade com a LGPD). Suporte a anonimização (exibe `203.0.113.x` em vez do IP completo).
+* Novo: **Blacklist de IPs** — aba "Segurança" para gerenciar IPs bloqueados. Visitantes bloqueados recebem 403. Adicione via botão no log ao vivo ou manualmente. Nota: em sites com cache de página completa, o bloqueio se aplica a requisições não-cacheadas.
+* Novo: **Bots sinalizados no log** — acessos de bots/crawlers sempre aparecem no log ao vivo com badge "bot", independente da configuração "Excluir bots". Estatísticas continuam excluindo bots.
+* Novo: **Detecção de navegação privada/anônima** — heurística JS por quota de storage; exibe badge "privado" no log quando detectado.
+* Novo: **ID parcial de sessão** — exibido no log para correlação de acessos.
+* Melhoria: bots agora são registrados no banco com flag `is_bot=1` e todas as queries de estatísticas filtram `is_bot = 0`.
 
 = 1.2.1 =
 * Correção: gráficos de "Sessões e visualizações no tempo" e "Canais de aquisição" cresciam infinitamente (loop de resize do Chart.js). Canvas envolvido em wrapper com altura fixa (`position: relative; height: Xpx`).

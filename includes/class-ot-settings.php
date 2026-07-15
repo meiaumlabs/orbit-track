@@ -17,10 +17,11 @@ class OT_Settings {
 	public static function defaults() {
 		return array(
 			'exclude_roles'   => array( 'administrator', 'editor' ), // Não rastreia estes papéis logados.
-			'exclude_bots'    => 1,      // Ignora user agents de bots conhecidos.
+			'exclude_bots'    => 1,      // Ignora user agents de bots conhecidos nas estatísticas.
 			'respect_dnt'     => 0,      // Respeitar cabeçalho Do Not Track.
 			'geo_enabled'     => 1,      // Ativa geolocalização por IP.
-			'anonymize_ip'    => 1,      // Nunca armazena o IP; usa hash com salt.
+			'store_ip'        => 0,      // Armazena o IP do visitante (sujeito à LGPD/GDPR — padrão OFF).
+			'anonymize_ip'    => 1,      // Anonimiza o IP no painel (último octeto zerado).
 			'retention_days'  => 365,    // Dias para manter os dados (0 = para sempre).
 			'session_timeout' => 30,     // Minutos de inatividade que encerram a sessão.
 		);
@@ -78,6 +79,7 @@ class OT_Settings {
 		$out['exclude_bots']    = empty( $input['exclude_bots'] ) ? 0 : 1;
 		$out['respect_dnt']     = empty( $input['respect_dnt'] ) ? 0 : 1;
 		$out['geo_enabled']     = empty( $input['geo_enabled'] ) ? 0 : 1;
+		$out['store_ip']        = empty( $input['store_ip'] ) ? 0 : 1;
 		$out['anonymize_ip']    = empty( $input['anonymize_ip'] ) ? 0 : 1;
 		$out['retention_days']  = isset( $input['retention_days'] ) ? max( 0, (int) $input['retention_days'] ) : $d['retention_days'];
 		$out['session_timeout'] = isset( $input['session_timeout'] ) ? max( 1, (int) $input['session_timeout'] ) : $d['session_timeout'];

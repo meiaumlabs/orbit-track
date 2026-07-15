@@ -30,6 +30,9 @@ class OT_Ajax {
 		add_action( 'wp_ajax_ot_save_goals', array( __CLASS__, 'save_goals' ) );
 		add_action( 'wp_ajax_ot_save_settings', array( __CLASS__, 'save_settings' ) );
 		add_action( 'wp_ajax_ot_reset_data', array( __CLASS__, 'reset_data' ) );
+		add_action( 'wp_ajax_ot_blocklist_add', array( __CLASS__, 'blocklist_add' ) );
+		add_action( 'wp_ajax_ot_blocklist_remove', array( __CLASS__, 'blocklist_remove' ) );
+		add_action( 'wp_ajax_ot_blocklist_get', array( __CLASS__, 'blocklist_get' ) );
 	}
 
 	/** Registra um pageview vindo do beacon. */
@@ -173,6 +176,45 @@ class OT_Ajax {
 		self::guard_admin();
 		OT_DB::truncate();
 		wp_send_json_success();
+	}
+
+	/** Adiciona um IP à blacklist (por session_db_id ou por IP manual). */
+	public static function blocklist_add() {
+		self::guard_admin();
+
+		$reason = isset( $_POST['reason'] ) ? sanitize_text_field( wp_unslash( $_POST['reason'] ) ) : '';
+
+		// Via ID de sessão (botão no log — IP nunca exposto ao cliente).
+		if ( ! empty( $_POST['session_db_id'] ) ) {
+			$ok = OT_Blocklist::add_by_session( (int) $_POST['session_db_id'], $reason );
+			if ( $ok ) {
+				wp_send_json_success( array( 'entries' => OT_Blocklist::all() ) );
+			}
+			wp_send_json_error( array( 'message' => 'IP não encontrado ou inválido.' ) );
+		}
+
+		// Via IP digitado manualmente.
+		$ip = isset( $_POST['ip'] ) ? sanitize_text_field( wp_unslash( $_POST['ip'] ) ) : '';
+		if ( OT_Blocklist::add( $ip, $reason ) ) {
+			wp_send_json_success( array( 'entries' => OT_Blocklist::all() ) );
+		}
+		wp_send_json_error( array( 'message' => 'IP inválido.' ) );
+	}
+
+	/** Remove um IP da blacklist pelo ID da linha. */
+	public static function blocklist_remove() {
+		self::guard_admin();
+		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		if ( $id ) {
+			OT_Blocklist::remove( $id );
+		}
+		wp_send_json_success( array( 'entries' => OT_Blocklist::all() ) );
+	}
+
+	/** Lista todos os IPs bloqueados. */
+	public static function blocklist_get() {
+		self::guard_admin();
+		wp_send_json_success( array( 'entries' => OT_Blocklist::all() ) );
 	}
 
 	/** Nonce + capacidade para endpoints do painel. */

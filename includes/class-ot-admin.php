@@ -48,18 +48,26 @@ class OT_Admin {
 			'nonce'     => wp_create_nonce( 'ot_admin' ),
 			'channels'  => OT_Source::channel_labels(),
 			'goals'     => OT_Goals::all(),
+			'storeIp'   => (int) OT_Settings::get( 'store_ip' ),
 			'i18n'     => array(
-				'loading'  => __( 'Carregando…', 'orbit-track' ),
-				'error'    => __( 'Erro ao carregar os dados.', 'orbit-track' ),
-				'empty'    => __( 'Sem dados neste período.', 'orbit-track' ),
-				'sessions' => __( 'Sessões', 'orbit-track' ),
-				'pageviews'=> __( 'Visualizações', 'orbit-track' ),
-				'saved'    => __( 'Configurações salvas.', 'orbit-track' ),
-				'goalsSaved' => __( 'Metas salvas.', 'orbit-track' ),
-				'confirmReset' => __( 'Apagar TODOS os dados de tracking? Esta ação não pode ser desfeita.', 'orbit-track' ),
-				'online'   => __( 'online agora', 'orbit-track' ),
-				'live'     => __( 'Ao vivo', 'orbit-track' ),
-				'paused'   => __( 'Pausado', 'orbit-track' ),
+				'loading'       => __( 'Carregando…', 'orbit-track' ),
+				'error'         => __( 'Erro ao carregar os dados.', 'orbit-track' ),
+				'empty'         => __( 'Sem dados neste período.', 'orbit-track' ),
+				'sessions'      => __( 'Sessões', 'orbit-track' ),
+				'pageviews'     => __( 'Visualizações', 'orbit-track' ),
+				'saved'         => __( 'Configurações salvas.', 'orbit-track' ),
+				'goalsSaved'    => __( 'Metas salvas.', 'orbit-track' ),
+				'confirmReset'  => __( 'Apagar TODOS os dados de tracking? Esta ação não pode ser desfeita.', 'orbit-track' ),
+				'online'        => __( 'online agora', 'orbit-track' ),
+				'live'          => __( 'Ao vivo', 'orbit-track' ),
+				'paused'        => __( 'Pausado', 'orbit-track' ),
+				'block'         => __( 'Bloquear IP', 'orbit-track' ),
+				'blocked'       => __( 'Bloqueado', 'orbit-track' ),
+				'confirmBlock'  => __( 'Adicionar este IP à blacklist? O visitante não poderá mais acessar o site.', 'orbit-track' ),
+				'confirmUnblock'=> __( 'Remover este IP da blacklist?', 'orbit-track' ),
+				'blockAdded'    => __( 'IP bloqueado com sucesso.', 'orbit-track' ),
+				'blockRemoved'  => __( 'IP desbloqueado.', 'orbit-track' ),
+				'noIpStored'    => __( 'Habilite "Armazenar IP" nas Configurações para usar esta função.', 'orbit-track' ),
 			),
 		) );
 	}
@@ -98,11 +106,17 @@ class OT_Admin {
 				<a class="ot-tab <?php echo 'audience' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=audience' ) ); ?>"><?php esc_html_e( 'Público', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'content' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=content' ) ); ?>"><?php esc_html_e( 'Conteúdo', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'goals' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=goals' ) ); ?>"><?php esc_html_e( 'Metas', 'orbit-track' ); ?></a>
+				<a class="ot-tab <?php echo 'security' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=security' ) ); ?>"><?php esc_html_e( 'Segurança', 'orbit-track' ); ?></a>
 				<a class="ot-tab <?php echo 'settings' === $tab ? 'is-active' : ''; ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=orbit-track&ot-tab=settings' ) ); ?>"><?php esc_html_e( 'Configurações', 'orbit-track' ); ?></a>
 			</nav>
 
 			<?php if ( 'settings' === $tab ) : ?>
 				<?php self::render_settings(); ?>
+			<?php elseif ( 'security' === $tab ) : ?>
+				<?php // Segurança é renderizada via JS (AJAX). ?>
+				<div id="ot-view" data-tab="security">
+					<div class="ot-loading"><?php esc_html_e( 'Carregando…', 'orbit-track' ); ?></div>
+				</div>
 			<?php else : ?>
 				<?php if ( 'live' !== $tab ) : ?>
 				<div class="ot-toolbar">
@@ -148,7 +162,7 @@ class OT_Admin {
 
 			<label class="ot-switch">
 				<input type="checkbox" id="ot-exclude-bots" <?php checked( $s['exclude_bots'] ); ?>>
-				<span><?php esc_html_e( 'Ignorar bots e crawlers conhecidos', 'orbit-track' ); ?></span>
+				<span><?php esc_html_e( 'Excluir bots das estatísticas (eles continuam aparecendo no log ao vivo para análise)', 'orbit-track' ); ?></span>
 			</label>
 			<label class="ot-switch">
 				<input type="checkbox" id="ot-geo-enabled" <?php checked( $s['geo_enabled'] ); ?>>
@@ -157,6 +171,14 @@ class OT_Admin {
 			<label class="ot-switch">
 				<input type="checkbox" id="ot-respect-dnt" <?php checked( $s['respect_dnt'] ); ?>>
 				<span><?php esc_html_e( 'Respeitar o cabeçalho "Do Not Track" do navegador', 'orbit-track' ); ?></span>
+			</label>
+			<label class="ot-switch">
+				<input type="checkbox" id="ot-store-ip" <?php checked( $s['store_ip'] ); ?>>
+				<span><?php esc_html_e( 'Armazenar IP do visitante (necessário para blacklist; sujeito à LGPD/GDPR)', 'orbit-track' ); ?></span>
+			</label>
+			<label class="ot-switch">
+				<input type="checkbox" id="ot-anonymize-ip" <?php checked( $s['anonymize_ip'] ); ?>>
+				<span><?php esc_html_e( 'Anonimizar IP no painel (exibe 203.0.113.x em vez do IP completo)', 'orbit-track' ); ?></span>
 			</label>
 
 			<div class="ot-field-row">
@@ -170,7 +192,7 @@ class OT_Admin {
 				</div>
 			</div>
 
-			<p class="ot-muted"><?php esc_html_e( 'Privacidade: o Orbit Track é cookieless e nunca armazena o endereço IP — apenas um identificador anônimo com hash e o resultado geográfico agregado.', 'orbit-track' ); ?></p>
+			<p class="ot-muted"><?php esc_html_e( 'Privacidade: o Orbit Track é cookieless e usa um identificador anônimo com hash. O IP só é armazenado quando a opção acima estiver ativa — verifique a conformidade com a LGPD antes de habilitá-la.', 'orbit-track' ); ?></p>
 
 			<div class="ot-field-actions">
 				<button class="ot-btn ot-btn-primary" id="ot-save-settings"><?php esc_html_e( 'Salvar configurações', 'orbit-track' ); ?></button>

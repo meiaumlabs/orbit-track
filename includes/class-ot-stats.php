@@ -88,12 +88,14 @@ class OT_Stats {
 				COALESCE(AVG(duration),0) AS avg_duration,
 				COALESCE(AVG(is_bounce)*100,0) AS bounce_rate,
 				COALESCE(SUM(is_new_visitor),0) AS new_visitors
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s",
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND is_bot = 0",
 			$from, $to
 		), ARRAY_A );
 
 		$total_pv = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(*) FROM {$h} WHERE created_at BETWEEN %s AND %s",
+			"SELECT COUNT(*) FROM {$h} h
+			 LEFT JOIN {$s} s ON s.session_uid = h.session_uid
+			 WHERE h.created_at BETWEEN %s AND %s AND COALESCE(s.is_bot,0) = 0",
 			$from, $to
 		) );
 
@@ -119,13 +121,15 @@ class OT_Stats {
 
 		$sess = $wpdb->get_results( $wpdb->prepare(
 			"SELECT DATE(started_at) AS d, COUNT(*) AS c
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s GROUP BY DATE(started_at)",
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND is_bot = 0 GROUP BY DATE(started_at)",
 			$from, $to
 		), OBJECT_K );
 
 		$views = $wpdb->get_results( $wpdb->prepare(
-			"SELECT DATE(created_at) AS d, COUNT(*) AS c
-			 FROM {$h} WHERE created_at BETWEEN %s AND %s GROUP BY DATE(created_at)",
+			"SELECT DATE(h.created_at) AS d, COUNT(*) AS c
+			 FROM {$h} h LEFT JOIN {$s} s ON s.session_uid = h.session_uid
+			 WHERE h.created_at BETWEEN %s AND %s AND COALESCE(s.is_bot,0) = 0
+			 GROUP BY DATE(h.created_at)",
 			$from, $to
 		), OBJECT_K );
 
@@ -155,7 +159,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT channel, COUNT(*) AS sessions, COALESCE(AVG(is_bounce)*100,0) AS bounce, COALESCE(AVG(duration),0) AS dur
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND is_bot = 0
 			 GROUP BY channel ORDER BY sessions DESC",
 			$from, $to
 		), ARRAY_A );
@@ -181,7 +185,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT {$col} AS label, COUNT(*) AS sessions
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND {$col} <> ''
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND {$col} <> '' AND is_bot = 0
 			 GROUP BY {$col} ORDER BY sessions DESC LIMIT %d",
 			$from, $to, $limit
 		), ARRAY_A );
@@ -198,7 +202,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT campaign, source, medium, COUNT(*) AS sessions, COALESCE(AVG(duration),0) AS dur
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND campaign <> ''
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND campaign <> '' AND is_bot = 0
 			 GROUP BY campaign, source, medium ORDER BY sessions DESC LIMIT 15",
 			$from, $to
 		), ARRAY_A );
@@ -220,13 +224,15 @@ class OT_Stats {
 		$h = OT_DB::hits_table();
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT path,
-			        MAX(title) AS title,
+			"SELECT h.path,
+			        MAX(h.title) AS title,
 			        COUNT(*) AS views,
-			        COUNT(DISTINCT session_uid) AS sessions,
-			        COALESCE(AVG(NULLIF(time_on_page,0)),0) AS avg_time
-			 FROM {$h} WHERE created_at BETWEEN %s AND %s
-			 GROUP BY path ORDER BY views DESC LIMIT %d",
+			        COUNT(DISTINCT h.session_uid) AS sessions,
+			        COALESCE(AVG(NULLIF(h.time_on_page,0)),0) AS avg_time
+			 FROM {$h} h
+			 LEFT JOIN " . OT_DB::sessions_table() . " s ON s.session_uid = h.session_uid
+			 WHERE h.created_at BETWEEN %s AND %s AND COALESCE(s.is_bot,0) = 0
+			 GROUP BY h.path ORDER BY views DESC LIMIT %d",
 			$from, $to, $limit
 		), ARRAY_A );
 
@@ -248,7 +254,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT landing_page AS path, COUNT(*) AS sessions, COALESCE(AVG(is_bounce)*100,0) AS bounce
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND landing_page <> ''
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND landing_page <> '' AND is_bot = 0
 			 GROUP BY landing_page ORDER BY sessions DESC LIMIT %d",
 			$from, $to, $limit
 		), ARRAY_A );
@@ -270,7 +276,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT {$col} AS label, country_code, COUNT(*) AS sessions
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND {$col} <> ''
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND {$col} <> '' AND is_bot = 0
 			 GROUP BY {$col}, country_code ORDER BY sessions DESC LIMIT %d",
 			$from, $to, $limit
 		), ARRAY_A );
@@ -292,7 +298,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT {$col} AS label, COUNT(*) AS sessions
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND {$col} <> ''
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND {$col} <> '' AND is_bot = 0
 			 GROUP BY {$col} ORDER BY sessions DESC LIMIT %d",
 			$from, $to, $limit
 		), ARRAY_A );
@@ -348,7 +354,7 @@ class OT_Stats {
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT country_code AS cc, COUNT(*) AS sessions
-			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND country_code <> ''
+			 FROM {$s} WHERE started_at BETWEEN %s AND %s AND country_code <> '' AND is_bot = 0
 			 GROUP BY country_code ORDER BY sessions DESC",
 			$from, $to
 		), ARRAY_A );
@@ -402,7 +408,9 @@ class OT_Stats {
 
 		$sql = "SELECT h.id, h.created_at, h.path, h.title, h.channel, h.device_type, h.country_code,
 		               h.is_entry, h.time_on_page, h.referrer,
-		               s.browser, s.os, s.country, s.city, s.is_new_visitor
+		               s.id AS session_db_id, s.browser, s.os, s.country, s.city,
+		               s.is_new_visitor, s.is_bot, s.is_private, s.ip_address,
+		               s.source, s.session_uid
 		        FROM {$h} h
 		        LEFT JOIN {$s} s ON s.session_uid = h.session_uid
 		        WHERE {$where}
@@ -411,29 +419,65 @@ class OT_Stats {
 		$args[] = $limit;
 		$args[] = $offset;
 
-		$rows   = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
-		$labels = OT_Source::channel_labels();
+		$rows     = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
+		$labels   = OT_Source::channel_labels();
+		$store_ip = OT_Settings::get( 'store_ip' );
+		$anon_ip  = OT_Settings::get( 'anonymize_ip' );
 
-		return array_map( function ( $r ) use ( $labels ) {
+		return array_map( function ( $r ) use ( $labels, $store_ip, $anon_ip ) {
+			$ip = '';
+			if ( $store_ip && ! empty( $r['ip_address'] ) ) {
+				$ip = $anon_ip ? self::anonymize_ip( $r['ip_address'] ) : $r['ip_address'];
+			}
+			$sid_short = ! empty( $r['session_uid'] ) ? substr( $r['session_uid'], 0, 8 ) : '';
 			return array(
-				'id'          => (int) $r['id'],
-				'time'        => $r['created_at'],
-				'path'        => $r['path'],
-				'title'       => $r['title'] ? $r['title'] : $r['path'],
-				'channel'     => $r['channel'],
-				'channel_label' => isset( $labels[ $r['channel'] ] ) ? $labels[ $r['channel'] ] : $r['channel'],
-				'device'      => $r['device_type'],
-				'browser'     => $r['browser'],
-				'os'          => $r['os'],
-				'cc'          => $r['country_code'] ? $r['country_code'] : '',
-				'country'     => $r['country'],
-				'city'        => $r['city'],
-				'referrer'    => $r['referrer'],
-				'is_entry'    => (int) $r['is_entry'],
-				'is_new'      => (int) $r['is_new_visitor'],
-				'time_on_page'=> (int) $r['time_on_page'],
+				'id'             => (int) $r['id'],
+				'time'           => $r['created_at'],
+				'path'           => $r['path'],
+				'title'          => $r['title'] ? $r['title'] : $r['path'],
+				'channel'        => $r['channel'],
+				'channel_label'  => isset( $labels[ $r['channel'] ] ) ? $labels[ $r['channel'] ] : $r['channel'],
+				'device'         => $r['device_type'],
+				'browser'        => $r['browser'],
+				'os'             => $r['os'],
+				'cc'             => $r['country_code'] ? $r['country_code'] : '',
+				'country'        => $r['country'],
+				'city'           => $r['city'],
+				'referrer'       => $r['referrer'],
+				'source'         => $r['source'],
+				'is_entry'       => (int) $r['is_entry'],
+				'is_new'         => (int) $r['is_new_visitor'],
+				'is_bot'         => (int) $r['is_bot'],
+				'is_private'     => (int) $r['is_private'],
+				'time_on_page'   => (int) $r['time_on_page'],
+				'ip'             => $ip,
+				'session_db_id'  => $store_ip ? (int) $r['session_db_id'] : 0,
+				'sid'            => $sid_short,
 			);
 		}, $rows );
+	}
+
+	/**
+	 * Anonimiza um endereço IP para exibição.
+	 * IPv4: zera o último octeto (ex.: 203.0.113.x).
+	 * IPv6: zera os últimos 80 bits (ex.: 2001:db8:85a3::x).
+	 *
+	 * @param string $ip IP completo armazenado.
+	 * @return string
+	 */
+	private static function anonymize_ip( $ip ) {
+		if ( '' === $ip ) {
+			return '';
+		}
+		if ( strpos( $ip, ':' ) === false ) {
+			// IPv4.
+			$parts    = explode( '.', $ip );
+			$parts[3] = 'x';
+			return implode( '.', $parts );
+		}
+		// IPv6: preserva os primeiros 3 grupos.
+		$groups = explode( ':', $ip );
+		return implode( ':', array_slice( $groups, 0, 3 ) ) . '::x';
 	}
 
 	/** Whitelist de colunas para evitar SQL injection em GROUP BY. */

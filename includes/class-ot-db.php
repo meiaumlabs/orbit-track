@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class OT_DB {
 
 	/** Incremente ao alterar o schema para disparar migração. */
-	const DB_VERSION = '1.1.0';
+	const DB_VERSION = '1.3.0';
 
 	/** @return string Nome da tabela de sessões (visitas). */
 	public static function sessions_table() {
@@ -48,6 +48,7 @@ class OT_DB {
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			session_uid CHAR(36) NOT NULL,
 			visitor_hash CHAR(40) NOT NULL,
+			ip_address VARCHAR(45) NOT NULL DEFAULT '',
 			channel VARCHAR(30) NOT NULL DEFAULT 'direct',
 			source VARCHAR(191) NOT NULL DEFAULT '',
 			medium VARCHAR(100) NOT NULL DEFAULT '',
@@ -65,6 +66,8 @@ class OT_DB {
 			region VARCHAR(120) NOT NULL DEFAULT '',
 			city VARCHAR(120) NOT NULL DEFAULT '',
 			is_new_visitor TINYINT(1) NOT NULL DEFAULT 1,
+			is_bot TINYINT(1) NOT NULL DEFAULT 0,
+			is_private TINYINT(1) NOT NULL DEFAULT 0,
 			pageviews INT UNSIGNED NOT NULL DEFAULT 0,
 			duration INT UNSIGNED NOT NULL DEFAULT 0,
 			is_bounce TINYINT(1) NOT NULL DEFAULT 1,
@@ -76,7 +79,8 @@ class OT_DB {
 			KEY channel (channel),
 			KEY started_at (started_at),
 			KEY country_code (country_code),
-			KEY device_type (device_type)
+			KEY device_type (device_type),
+			KEY is_bot (is_bot)
 		) {$charset};";
 
 		// Uma linha por pageview.
@@ -124,6 +128,8 @@ class OT_DB {
 		dbDelta( $sql_sessions );
 		dbDelta( $sql_hits );
 		dbDelta( $sql_outbound );
+
+		OT_Blocklist::install();
 	}
 
 	/**

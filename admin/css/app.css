@@ -337,6 +337,58 @@
 @keyframes ot-flash { from { background-color: rgba(99,102,241,.13); } to { background-color: transparent; } }
 .ot-log-flash td { animation: ot-flash 1.8s ease-out; }
 
+/* ── Log — campos novos ────────────────────────────────────────────── */
+.ot-log-source {
+	display: block; font-size: 11px; color: var(--ot-muted);
+	margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;
+}
+.ot-log-ip {
+	font-size: 11px; color: var(--ot-muted); font-variant-numeric: tabular-nums;
+	white-space: nowrap; display: block;
+}
+.ot-log-ip--off { opacity: .4; }
+.ot-log-ip-cell { white-space: nowrap; min-width: 110px; }
+.ot-log-sid {
+	display: block; font-size: 10px; color: var(--ot-muted);
+	opacity: .6; font-variant-numeric: tabular-nums; letter-spacing: .03em;
+	margin-top: 2px;
+}
+
+/* Bot row — fundo levemente alaranjado */
+.ot-row-bot td { background: rgba(245,158,11,.05) !important; }
+
+/* ── Tags — bot e privado ──────────────────────────────────────────── */
+.ot-tag-bot     { background: rgba(245,158,11,.15); color: #b45309; border-color: rgba(245,158,11,.35); }
+.ot-tag-private { background: rgba(99,102,241,.1);  color: var(--ot-primary); border-color: rgba(99,102,241,.25); }
+
+/* ── Botão de bloqueio (no log) ────────────────────────────────────── */
+.ot-btn-block {
+	background: none; border: 1px solid rgba(220,38,38,.3); color: var(--ot-red);
+	border-radius: 6px; padding: 3px 7px; cursor: pointer; font-size: 13px;
+	transition: background .12s, border-color .12s; margin-top: 4px; display: block;
+}
+.ot-btn-block:hover { background: var(--ot-red-bg); border-color: var(--ot-red); }
+.ot-btn-block.is-blocked { color: var(--ot-green); border-color: var(--ot-green-bd); background: var(--ot-green-bg); cursor: default; }
+
+/* ── Aba Segurança ─────────────────────────────────────────────────── */
+.ot-blocklist-add-row {
+	display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+}
+.ot-input-text {
+	background: var(--ot-card); border: 1px solid var(--ot-line);
+	color: var(--ot-text); border-radius: 8px; padding: 8px 12px;
+	font-size: 13px; transition: border-color .12s; min-width: 180px;
+}
+.ot-input-text:focus { outline: 2px solid var(--ot-primary); border-color: var(--ot-primary); }
+.ot-bl-ip { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* ── Alerta ────────────────────────────────────────────────────────── */
+.ot-alert {
+	padding: 12px 16px; border-radius: 8px; font-size: 13px;
+	margin-bottom: 16px; border: 1px solid transparent;
+}
+.ot-alert-warn { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.35); color: #92400e; }
+
 .ot-ext { color: var(--ot-primary); text-decoration: none; word-break: break-all; }
 .ot-ext:hover { text-decoration: underline; color: var(--ot-primary-d); }
 

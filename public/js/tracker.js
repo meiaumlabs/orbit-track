@@ -101,6 +101,23 @@
 	var lastActive = Date.now();
 	var pinged = false;
 
+	/**
+	 * Heurística de modo anônimo/privado: em private browsing o navegador
+	 * limita drasticamente a quota de storage (< 200 MB no Chrome; ≈ 0 no Firefox).
+	 * Não é 100% preciso, mas é a melhor abordagem client-side sem cookies.
+	 */
+	function detectPrivate(cb) {
+		try {
+			if (navigator.storage && navigator.storage.estimate) {
+				navigator.storage.estimate().then(function (q) {
+					cb(q.quota > 0 && q.quota < 200 * 1024 * 1024);
+				}).catch(function () { cb(false); });
+				return;
+			}
+		} catch (e) {}
+		cb(false);
+	}
+
 	// Envia o hit no carregamento e guarda o ID retornado para o ping de tempo.
 	// Preferência: rota REST (JSON). Só cai para admin-ajax se a REST falhar na
 	// REDE (.catch) — nunca quando a REST responde ok:false (ex.: bot filtrado),
@@ -249,10 +266,17 @@
 	window.addEventListener('pagehide', sendPing);
 	window.addEventListener('beforeunload', sendPing);
 
-	// Dispara o hit assim que possível.
+	// Detecta modo privado e dispara o hit assim que possível.
+	function initHit() {
+		detectPrivate(function (isPrivate) {
+			if (isPrivate) { payload.is_private = 1; }
+			sendHit();
+		});
+	}
+
 	if (document.readyState === 'complete' || document.readyState === 'interactive') {
-		sendHit();
+		initHit();
 	} else {
-		document.addEventListener('DOMContentLoaded', sendHit);
+		document.addEventListener('DOMContentLoaded', initHit);
 	}
 })();

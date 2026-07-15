@@ -71,13 +71,17 @@ class OT_Tracker {
 	public static function record_pageview( array $in ) {
 		global $wpdb;
 
-		$ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
-
-		// Filtro de bots.
-		if ( OT_Settings::get( 'exclude_bots' ) && OT_UA::is_bot( $ua ) ) {
+		// Blocklist: rejeita sem registrar (IP já está explicitamente bloqueado).
+		$ip = OT_Geo::client_ip();
+		if ( $ip && OT_Blocklist::is_blocked( $ip ) ) {
 			return array( 'ok' => false );
 		}
 
+		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+		$is_bot = OT_UA::is_bot( $ua ) ? 1 : 0;
+
+		// Bots são sempre registrados no log (com is_bot=1) para que o admin
+		// possa identificá-los e bloqueá-los. As estatísticas os excluem.
 		$device = OT_UA::parse( $ua );
 
 		$url      = isset( $in['url'] ) ? esc_url_raw( $in['url'] ) : '';
@@ -89,9 +93,13 @@ class OT_Tracker {
 		$session_uid  = self::sanitize_uid( isset( $in['sid'] ) ? $in['sid'] : '' );
 		$visitor_uid  = self::sanitize_uid( isset( $in['vid'] ) ? $in['vid'] : '' );
 		$is_new       = ! empty( $in['new_visitor'] ) ? 1 : 0;
+		$is_private   = ! empty( $in['is_private'] ) ? 1 : 0;
 		if ( ! $session_uid || ! $visitor_uid ) {
 			return array( 'ok' => false );
 		}
+
+		// IP: armazena somente quando a opção store_ip estiver ativa.
+		$ip_to_store = ( OT_Settings::get( 'store_ip' ) && $ip ) ? $ip : '';
 
 		// Hash do visitante (privacidade — nunca guarda IP/UID em claro no relatório).
 		$salt         = (string) get_option( 'ot_visitor_salt' );
@@ -125,13 +133,14 @@ class OT_Tracker {
 				$path, $now, $existing->id
 			) );
 		} else {
-			// Nova sessão — geolocaliza e grava a atribuição da origem (first touch).
-			$ip  = OT_Geo::client_ip();
-			$geo = OT_Geo::locate( $ip );
+			// Nova sessão — geolocaliza (bots pulam geo para economizar chamadas externas).
+			$geo = $is_bot ? array( 'country_code' => '', 'country' => '', 'region' => '', 'city' => '' )
+			               : OT_Geo::locate( $ip );
 
 			$wpdb->insert( $sessions, array(
 				'session_uid'    => $session_uid,
 				'visitor_hash'   => $visitor_hash,
+				'ip_address'     => $ip_to_store,
 				'channel'        => $attr['channel'],
 				'source'         => $attr['source'],
 				'medium'         => $attr['medium'],
@@ -149,6 +158,8 @@ class OT_Tracker {
 				'region'         => $geo['region'],
 				'city'           => $geo['city'],
 				'is_new_visitor' => $is_new,
+				'is_bot'         => $is_bot,
+				'is_private'     => $is_private,
 				'pageviews'      => 1,
 				'duration'       => 0,
 				'is_bounce'      => 1,

@@ -7,7 +7,7 @@
 	var trendChart = null;
 	var channelChart = null;
 
-	/* ---------- helpers ---------- */
+	/* ── helpers ─────────────────────────────────────────────────────── */
 
 	function post(action, data) {
 		var body = new URLSearchParams();
@@ -57,7 +57,11 @@
 			String.fromCodePoint(A + cc.toUpperCase().charCodeAt(1) - 65);
 	}
 
-	/* ---------- render blocks ---------- */
+	function loadingHtml() {
+		return '<div class="ot-loading"><div class="ot-spinner"></div>' + esc(OT.i18n.loading) + '</div>';
+	}
+
+	/* ── render blocks ───────────────────────────────────────────────── */
 
 	function kpiCard(label, value, sub) {
 		return '<div class="ot-kpi"><span class="ot-kpi-label">' + esc(label) + '</span>' +
@@ -68,7 +72,7 @@
 	function barList(title, rows, valueKey, opts) {
 		opts = opts || {};
 		if (!rows || !rows.length) {
-			return '<div class="ot-card"><h3>' + esc(title) + '</h3><p class="ot-empty">' + OT.i18n.empty + '</p></div>';
+			return '<div class="ot-card"><h3>' + esc(title) + '</h3><p class="ot-empty">' + esc(OT.i18n.empty) + '</p></div>';
 		}
 		var max = rows.reduce(function (m, r) { return Math.max(m, Number(r[valueKey]) || 0); }, 0) || 1;
 		var body = rows.map(function (r) {
@@ -85,7 +89,7 @@
 
 	function table(title, head, rows) {
 		if (!rows || !rows.length) {
-			return '<div class="ot-card"><h3>' + esc(title) + '</h3><p class="ot-empty">' + OT.i18n.empty + '</p></div>';
+			return '<div class="ot-card"><h3>' + esc(title) + '</h3><p class="ot-empty">' + esc(OT.i18n.empty) + '</p></div>';
 		}
 		var th = head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('');
 		var body = rows.join('');
@@ -93,7 +97,7 @@
 			'<table class="ot-table"><thead><tr>' + th + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 	}
 
-	/* ---------- tabs ---------- */
+	/* ── tabs ────────────────────────────────────────────────────────── */
 
 	function renderDashboard(d) {
 		var k = d.kpis;
@@ -198,7 +202,16 @@
 		return map[t] || t;
 	}
 
-	/* ---------- charts ---------- */
+	/* ── charts ──────────────────────────────────────────────────────── */
+
+	var CHART_COLORS = {
+		text:   '#1d2327',
+		muted:  '#6b7280',
+		grid:   'rgba(0,0,0,.07)',
+		primary:'#6366f1',
+		green:  '#16a34a',
+		palette: ['#6366f1', '#16a34a', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#ef4444', '#14b8a6', '#64748b', '#a3a3a3']
+	};
 
 	function drawTrend(series) {
 		var el = document.getElementById('ot-trend');
@@ -210,14 +223,44 @@
 			data: {
 				labels: labels,
 				datasets: [
-					{ label: OT.i18n.sessions, data: series.map(function (p) { return p.sessions; }), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,.12)', fill: true, tension: 0.35, borderWidth: 2, pointRadius: 0 },
-					{ label: OT.i18n.pageviews, data: series.map(function (p) { return p.pageviews; }), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)', fill: true, tension: 0.35, borderWidth: 2, pointRadius: 0 }
+					{
+						label: OT.i18n.sessions,
+						data: series.map(function (p) { return p.sessions; }),
+						borderColor: CHART_COLORS.primary,
+						backgroundColor: 'rgba(99,102,241,.08)',
+						fill: true, tension: 0.35, borderWidth: 2, pointRadius: 0,
+						pointHoverRadius: 4
+					},
+					{
+						label: OT.i18n.pageviews,
+						data: series.map(function (p) { return p.pageviews; }),
+						borderColor: CHART_COLORS.green,
+						backgroundColor: 'rgba(22,163,74,.07)',
+						fill: true, tension: 0.35, borderWidth: 2, pointRadius: 0,
+						pointHoverRadius: 4
+					}
 				]
 			},
 			options: {
 				responsive: true, maintainAspectRatio: false,
-				plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } } },
-				scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
+				plugins: {
+					legend: {
+						position: 'bottom',
+						labels: { boxWidth: 10, usePointStyle: true, color: CHART_COLORS.muted, font: { size: 12 } }
+					},
+					tooltip: { mode: 'index', intersect: false }
+				},
+				scales: {
+					x: {
+						grid: { display: false },
+						ticks: { color: CHART_COLORS.muted, font: { size: 11 } }
+					},
+					y: {
+						beginAtZero: true,
+						grid: { color: CHART_COLORS.grid },
+						ticks: { precision: 0, color: CHART_COLORS.muted, font: { size: 11 } }
+					}
+				}
 			}
 		});
 	}
@@ -226,16 +269,24 @@
 		var el = document.getElementById('ot-channels');
 		if (!el || typeof Chart === 'undefined') { return; }
 		if (channelChart) { channelChart.destroy(); }
-		var colors = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#ef4444', '#14b8a6', '#a3a3a3', '#64748b'];
 		channelChart = new Chart(el, {
 			type: 'doughnut',
 			data: {
 				labels: channels.map(function (c) { return c.label; }),
-				datasets: [{ data: channels.map(function (c) { return c.sessions; }), backgroundColor: colors, borderWidth: 0 }]
+				datasets: [{
+					data: channels.map(function (c) { return c.sessions; }),
+					backgroundColor: CHART_COLORS.palette,
+					borderWidth: 0
+				}]
 			},
 			options: {
 				responsive: true, maintainAspectRatio: false, cutout: '62%',
-				plugins: { legend: { position: 'right', labels: { boxWidth: 12, usePointStyle: true, font: { size: 11 } } } }
+				plugins: {
+					legend: {
+						position: 'right',
+						labels: { boxWidth: 10, usePointStyle: true, color: CHART_COLORS.muted, font: { size: 11 } }
+					}
+				}
 			}
 		});
 	}
@@ -245,7 +296,7 @@
 	function drawWorldMap(rows) {
 		var el = document.getElementById('ot-worldmap');
 		if (!el || typeof jsVectorMap === 'undefined') {
-			if (el) { el.innerHTML = '<p class="ot-empty">' + OT.i18n.empty + '</p>'; }
+			if (el) { el.innerHTML = '<p class="ot-empty">' + esc(OT.i18n.empty) + '</p>'; }
 			return;
 		}
 		if (worldMap) { try { worldMap.destroy(); } catch (e) {} worldMap = null; }
@@ -262,13 +313,13 @@
 				zoomOnScroll: false,
 				backgroundColor: 'transparent',
 				regionStyle: {
-					initial: { fill: '#232838', stroke: '#0f1117', strokeWidth: 0.4 },
-					hover: { fill: '#6366f1' }
+					initial: { fill: '#dde1e7', stroke: '#ffffff', strokeWidth: 0.5 },
+					hover:   { fill: '#6366f1' }
 				},
 				series: {
 					regions: [{
 						attribute: 'fill',
-						scale: ['#2a3350', '#6366f1'],
+						scale: ['#c7d2fe', '#6366f1'],
 						normalizeFunction: 'polynomial',
 						values: values
 					}]
@@ -279,11 +330,11 @@
 				}
 			});
 		} catch (e) {
-			el.innerHTML = '<p class="ot-empty">' + OT.i18n.empty + '</p>';
+			el.innerHTML = '<p class="ot-empty">' + esc(OT.i18n.empty) + '</p>';
 		}
 	}
 
-	/* ---------- live access log ---------- */
+	/* ── live access log ─────────────────────────────────────────────── */
 
 	var liveTimer = null;
 	var liveLastId = 0;
@@ -313,12 +364,12 @@
 		liveLastId = rows.length ? rows[0].id : 0;
 		var body = rows.map(logRow).join('');
 		var html = '<div class="ot-live-head">' +
-			'<div class="ot-online"><span class="ot-online-dot"></span><b>' + fmt(data.online) + '</b> ' + OT.i18n.online + '</div>' +
-			'<button class="ot-btn ot-btn-ghost" id="ot-live-toggle">' + (livePaused ? OT.i18n.paused : OT.i18n.live) + '</button>' +
+			'<div class="ot-online"><span class="ot-online-dot"></span><b>' + fmt(data.online) + '</b> ' + esc(OT.i18n.online) + '</div>' +
+			'<button class="ot-btn ot-btn-ghost" id="ot-live-toggle">' + esc(livePaused ? OT.i18n.paused : OT.i18n.live) + '</button>' +
 			'</div>' +
 			'<div class="ot-card ot-card-wide ot-log-card"><table class="ot-table ot-log-table">' +
 			'<thead><tr><th>Hora</th><th>Página</th><th>Canal</th><th>Local</th><th>Dispositivo</th></tr></thead>' +
-			'<tbody id="ot-log-body">' + (body || '<tr><td colspan="5" class="ot-empty">' + OT.i18n.empty + '</td></tr>') + '</tbody>' +
+			'<tbody id="ot-log-body">' + (body || '<tr><td colspan="5" class="ot-empty">' + esc(OT.i18n.empty) + '</td></tr>') + '</tbody>' +
 			'</table></div>';
 		view.innerHTML = html;
 
@@ -349,12 +400,10 @@
 			rows.slice().reverse().forEach(function (r) {
 				body.insertAdjacentHTML('afterbegin', logRow(r));
 			});
-			// Realça as linhas novas.
 			var first = body.querySelectorAll('tr');
 			for (var i = 0; i < rows.length && i < first.length; i++) {
 				first[i].classList.add('ot-log-flash');
 			}
-			// Limita o tamanho da tabela.
 			var all = body.querySelectorAll('tr');
 			for (var j = all.length - 1; j >= 120; j--) { all[j].remove(); }
 		}).catch(function () {});
@@ -362,17 +411,17 @@
 
 	function startLive() {
 		stopLive();
-		view.innerHTML = '<div class="ot-loading">' + OT.i18n.loading + '</div>';
+		view.innerHTML = loadingHtml();
 		post('ot_log', { limit: 50 }).then(function (res) {
 			if (!res || !res.success) { throw new Error('bad'); }
 			renderLive(res.data);
 			liveTimer = setInterval(pollLive, 8000);
 		}).catch(function () {
-			view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + OT.i18n.error + '</p></div>';
+			view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + esc(OT.i18n.error) + '</p></div>';
 		});
 	}
 
-	/* ---------- goals ---------- */
+	/* ── goals ───────────────────────────────────────────────────────── */
 
 	function matchLabel(t) {
 		var map = { contains: 'contém', exact: 'igual a', starts: 'começa com' };
@@ -391,7 +440,7 @@
 			'</select>' +
 			'<input type="text" class="ot-goal-value" placeholder="/obrigado" value="' + esc(g.value) + '">' +
 			'<label class="ot-goal-active"><input type="checkbox" class="ot-goal-on"' + (g.active ? ' checked' : '') + '> ativa</label>' +
-			'<button type="button" class="ot-btn ot-btn-danger ot-goal-del">×</button>' +
+			'<button type="button" class="ot-btn ot-btn-danger ot-goal-del" aria-label="Remover meta">×</button>' +
 			'</div>';
 	}
 
@@ -412,7 +461,7 @@
 			'<div class="ot-field-actions">' +
 			'<button class="ot-btn ot-btn-ghost" id="ot-goal-add">+ Adicionar meta</button>' +
 			'<button class="ot-btn ot-btn-primary" id="ot-goals-save">Salvar metas</button>' +
-			'<span class="ot-save-msg" id="ot-goals-msg"></span>' +
+			'<span class="ot-save-msg" id="ot-goals-msg" aria-live="polite"></span>' +
 			'</div></div>';
 
 		html += table('Desempenho das metas no período', ['Meta', 'Conversões', 'Visitantes', 'Total', 'Taxa'], stats);
@@ -422,7 +471,7 @@
 
 	function bindGoalsEditor() {
 		var list = document.getElementById('ot-goals-list');
-		var add = document.getElementById('ot-goal-add');
+		var add  = document.getElementById('ot-goal-add');
 		var save = document.getElementById('ot-goals-save');
 		if (add) {
 			add.addEventListener('click', function () {
@@ -446,15 +495,15 @@
 				body.append('nonce', OT.nonce);
 				var i = 0;
 				rows.forEach(function (r) {
-					var name = r.querySelector('.ot-goal-name').value.trim();
+					var name  = r.querySelector('.ot-goal-name').value.trim();
 					var value = r.querySelector('.ot-goal-value').value.trim();
 					if (!name || !value) { return; }
 					var pre = 'goals[' + i + ']';
-					body.append(pre + '[id]', r.getAttribute('data-id') || '');
-					body.append(pre + '[name]', name);
-					body.append(pre + '[match_type]', r.querySelector('.ot-goal-match').value);
-					body.append(pre + '[value]', value);
-					body.append(pre + '[active]', r.querySelector('.ot-goal-on').checked ? 1 : 0);
+					body.append(pre + '[id]',         r.getAttribute('data-id') || '');
+					body.append(pre + '[name]',        name);
+					body.append(pre + '[match_type]',  r.querySelector('.ot-goal-match').value);
+					body.append(pre + '[value]',       value);
+					body.append(pre + '[active]',      r.querySelector('.ot-goal-on').checked ? 1 : 0);
 					i++;
 				});
 				save.disabled = true;
@@ -479,7 +528,7 @@
 		}
 	}
 
-	/* ---------- load ---------- */
+	/* ── load ────────────────────────────────────────────────────────── */
 
 	function load() {
 		if (!view) { return; }
@@ -488,24 +537,24 @@
 		if (tab === 'live') { startLive(); return; }
 		stopLive();
 
-		view.innerHTML = '<div class="ot-loading">' + OT.i18n.loading + '</div>';
+		view.innerHTML = loadingHtml();
 
 		post('ot_report', { range: state.range, start: state.start, end: state.end })
 			.then(function (res) {
 				if (!res || !res.success) { throw new Error('bad'); }
 				var d = res.data;
-				if (tab === 'acquisition') { renderAcquisition(d); }
-				else if (tab === 'audience') { renderAudience(d); }
-				else if (tab === 'content') { renderContent(d); }
-				else if (tab === 'goals') { renderGoals(d); }
-				else { renderDashboard(d); }
+				if      (tab === 'acquisition') { renderAcquisition(d); }
+				else if (tab === 'audience')    { renderAudience(d); }
+				else if (tab === 'content')     { renderContent(d); }
+				else if (tab === 'goals')       { renderGoals(d); }
+				else                            { renderDashboard(d); }
 			})
 			.catch(function () {
-				view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + OT.i18n.error + '</p></div>';
+				view.innerHTML = '<div class="ot-card"><p class="ot-empty">' + esc(OT.i18n.error) + '</p></div>';
 			});
 	}
 
-	/* ---------- events ---------- */
+	/* ── events ──────────────────────────────────────────────────────── */
 
 	document.querySelectorAll('.ot-range-btn').forEach(function (btn) {
 		btn.addEventListener('click', function () {
@@ -530,7 +579,7 @@
 		});
 	}
 
-	/* ---------- settings ---------- */
+	/* ── settings ────────────────────────────────────────────────────── */
 
 	var saveBtn = document.getElementById('ot-save-settings');
 	if (saveBtn) {
@@ -544,11 +593,11 @@
 			body.append('action', 'ot_save_settings');
 			body.append('nonce', OT.nonce);
 			roles.forEach(function (r) { body.append('settings[exclude_roles][]', r); });
-			body.append('settings[exclude_bots]', document.getElementById('ot-exclude-bots').checked ? 1 : 0);
-			body.append('settings[geo_enabled]', document.getElementById('ot-geo-enabled').checked ? 1 : 0);
-			body.append('settings[respect_dnt]', document.getElementById('ot-respect-dnt').checked ? 1 : 0);
-			body.append('settings[retention_days]', document.getElementById('ot-retention').value);
-			body.append('settings[session_timeout]', document.getElementById('ot-timeout').value);
+			body.append('settings[exclude_bots]',  document.getElementById('ot-exclude-bots').checked  ? 1 : 0);
+			body.append('settings[geo_enabled]',   document.getElementById('ot-geo-enabled').checked   ? 1 : 0);
+			body.append('settings[respect_dnt]',   document.getElementById('ot-respect-dnt').checked   ? 1 : 0);
+			body.append('settings[retention_days]',document.getElementById('ot-retention').value);
+			body.append('settings[session_timeout]',document.getElementById('ot-timeout').value);
 
 			fetch(OT.ajax, {
 				method: 'POST', credentials: 'same-origin',
@@ -556,7 +605,10 @@
 				body: body.toString()
 			}).then(function (r) { return r.json(); }).then(function (res) {
 				saveBtn.disabled = false;
-				if (msg) { msg.textContent = res && res.success ? OT.i18n.saved : OT.i18n.error; msg.className = 'ot-save-msg ' + (res && res.success ? 'ok' : 'err'); }
+				if (msg) {
+					msg.textContent = res && res.success ? OT.i18n.saved : OT.i18n.error;
+					msg.className   = 'ot-save-msg ' + (res && res.success ? 'ok' : 'err');
+				}
 			}).catch(function () {
 				saveBtn.disabled = false;
 				if (msg) { msg.textContent = OT.i18n.error; msg.className = 'ot-save-msg err'; }
@@ -570,11 +622,14 @@
 			if (!window.confirm(OT.i18n.confirmReset)) { return; }
 			var msg = document.getElementById('ot-settings-msg');
 			post('ot_reset_data', {}).then(function (res) {
-				if (msg) { msg.textContent = res && res.success ? 'OK' : OT.i18n.error; msg.className = 'ot-save-msg ' + (res && res.success ? 'ok' : 'err'); }
+				if (msg) {
+					msg.textContent = res && res.success ? 'OK' : OT.i18n.error;
+					msg.className   = 'ot-save-msg ' + (res && res.success ? 'ok' : 'err');
+				}
 			});
 		});
 	}
 
-	/* ---------- init ---------- */
+	/* ── init ────────────────────────────────────────────────────────── */
 	if (view) { load(); }
 })();

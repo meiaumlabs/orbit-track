@@ -4,7 +4,7 @@ Tags: analytics, tracking, utm, estatisticas, visitantes, origem, dispositivos
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,6 +55,9 @@ Sim. A captura acontece via um beacon JavaScript executado no navegador, então 
 Não para rastreamento. O identificador de visitante fica no `localStorage` do navegador e é anonimizado por hash no servidor.
 
 == Changelog ==
+
+= 1.2.1 =
+* Correção: gráficos de "Sessões e visualizações no tempo" e "Canais de aquisição" cresciam infinitamente (loop de resize do Chart.js). Canvas envolvido em wrapper com altura fixa (`position: relative; height: Xpx`).
 
 = 1.2.0 =
 * Melhoria: **UI/UX redesenhada** — painel administrativo com novo visual, tipografia e layout modernizados.

@@ -111,10 +111,10 @@
 			'</div>';
 
 		html += '<div class="ot-card ot-card-wide"><h3>Sessões e visualizações no tempo</h3>' +
-			'<canvas id="ot-trend" height="90"></canvas></div>';
+			'<div class="ot-chart-box ot-chart-box--wide"><canvas id="ot-trend"></canvas></div></div>';
 
 		html += '<div class="ot-grid2">' +
-			'<div class="ot-card"><h3>Canais de aquisição</h3><canvas id="ot-channels" height="200"></canvas></div>' +
+			'<div class="ot-card"><h3>Canais de aquisição</h3><div class="ot-chart-box ot-chart-box--doughnut"><canvas id="ot-channels"></canvas></div></div>' +
 			barList('Origens (source)', d.sources, 'sessions') +
 			'</div>';
 

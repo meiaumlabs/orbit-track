@@ -139,6 +139,19 @@
 }
 .ot-kpi-sub { font-size: 12px; color: var(--ot-green); font-weight: 500; }
 
+/* ── Chart wrappers (F-003: fix Chart.js container height growth loop) ── */
+.ot-chart-box { position: relative; }
+.ot-chart-box--wide     { height: 320px; }
+.ot-chart-box--doughnut { height: 260px; }
+@media (max-width: 900px) {
+	.ot-chart-box--wide     { height: 260px; }
+	.ot-chart-box--doughnut { height: 220px; }
+}
+@media (max-width: 600px) {
+	.ot-chart-box--wide     { height: 220px; }
+	.ot-chart-box--doughnut { height: 200px; }
+}
+
 /* ── Cards ─────────────────────────────────────────────────────────── */
 .ot-card {
 	background: var(--ot-card); border: 1px solid var(--ot-line);

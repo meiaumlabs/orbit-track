@@ -4,7 +4,7 @@ Tags: analytics, tracking, utm, estatisticas, visitantes, origem, dispositivos
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,6 +55,9 @@ Sim. A captura acontece via um beacon JavaScript executado no navegador, então 
 Não para rastreamento. O identificador de visitante fica no `localStorage` do navegador e é anonimizado por hash no servidor.
 
 == Changelog ==
+
+= 1.3.1 =
+* Novo: **Exportar CSV** — botão "⬇ Exportar CSV" disponível em todas as abas com dados (Dashboard, Aquisição, Público, Conteúdo, Metas, Ao vivo, Segurança). Cada CSV inclui todas as tabelas da aba com cabeçalhos de seção, BOM UTF-8 para compatibilidade com Excel e nome de arquivo com a data do export.
 
 = 1.3.0 =
 * Novo: **Log de origem visível** — canal "Referência" e outros agora exibem o domínio de onde o visitante veio diretamente no log ao vivo.

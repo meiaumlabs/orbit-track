@@ -392,6 +392,17 @@
 .ot-ext { color: var(--ot-primary); text-decoration: none; word-break: break-all; }
 .ot-ext:hover { text-decoration: underline; color: var(--ot-primary-d); }
 
+/* ── Barra de exportação CSV ───────────────────────────────────────── */
+.ot-export-bar {
+	display: flex; justify-content: flex-end;
+	margin-bottom: 12px;
+}
+.ot-btn-export {
+	font-size: 12px; padding: 5px 14px; gap: 6px;
+	border-color: var(--ot-line); color: var(--ot-muted);
+}
+.ot-btn-export:hover { border-color: var(--ot-primary); color: var(--ot-primary); }
+
 /* ── Editor de metas ───────────────────────────────────────────────── */
 .ot-goals-editor code {
 	background: var(--ot-card-2); padding: 2px 6px;

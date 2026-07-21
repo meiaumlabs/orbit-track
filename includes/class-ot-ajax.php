@@ -33,6 +33,7 @@ class OT_Ajax {
 		add_action( 'wp_ajax_ot_blocklist_add', array( __CLASS__, 'blocklist_add' ) );
 		add_action( 'wp_ajax_ot_blocklist_remove', array( __CLASS__, 'blocklist_remove' ) );
 		add_action( 'wp_ajax_ot_blocklist_get', array( __CLASS__, 'blocklist_get' ) );
+		add_action( 'wp_ajax_ot_export_csv', array( __CLASS__, 'export_csv' ) );
 	}
 
 	/** Registra um pageview vindo do beacon. */
@@ -215,6 +216,226 @@ class OT_Ajax {
 	public static function blocklist_get() {
 		self::guard_admin();
 		wp_send_json_success( array( 'entries' => OT_Blocklist::all() ) );
+	}
+
+	/**
+	 * Exporta dados do painel como arquivo CSV (download direto).
+	 *
+	 * Aceita os mesmos parâmetros de range/start/end do endpoint report.
+	 * O campo `tab` indica qual aba exportar: dashboard|acquisition|audience|
+	 * content|goals|live|security.
+	 */
+	public static function export_csv() {
+		check_ajax_referer( 'ot_admin', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Acesso negado.', '', array( 'response' => 403 ) );
+		}
+
+		$tab   = isset( $_POST['tab'] )   ? sanitize_key( wp_unslash( $_POST['tab'] ) )               : 'dashboard';
+		$range = isset( $_POST['range'] ) ? sanitize_key( wp_unslash( $_POST['range'] ) )              : '28d';
+		$start = isset( $_POST['start'] ) ? sanitize_text_field( wp_unslash( $_POST['start'] ) )       : '';
+		$end   = isset( $_POST['end'] )   ? sanitize_text_field( wp_unslash( $_POST['end'] ) )         : '';
+
+		$filename = 'orbit-track-' . $tab . '-' . gmdate( 'Y-m-d' ) . '.csv';
+
+		// Forçar download sem cache.
+		header( 'Content-Type: text/csv; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Pragma: no-cache' );
+		header( 'Expires: 0' );
+
+		// BOM UTF-8 para compatibilidade com Excel.
+		echo "\xEF\xBB\xBF";
+
+		$out = fopen( 'php://output', 'w' );
+
+		// Helper: seção com cabeçalho visual.
+		$section = function ( $title ) use ( $out ) {
+			fputcsv( $out, array() );
+			fputcsv( $out, array( '=== ' . $title . ' ===' ) );
+		};
+
+		if ( 'live' === $tab ) {
+			// Log ao vivo — independe de range.
+			$rows = OT_Stats::access_log( 200, 0, 0 );
+			fputcsv( $out, array( 'Hora', 'Página', 'Título', 'Canal', 'Origem / referência', 'País', 'Cidade', 'Dispositivo', 'Navegador', 'SO', 'Bot', 'Privado', 'ID de sessão (parcial)', 'Tempo na página (s)' ) );
+			foreach ( $rows as $r ) {
+				fputcsv( $out, array(
+					$r['time'],
+					$r['path'],
+					$r['title'],
+					$r['channel_label'],
+					$r['source'] ? $r['source'] : $r['referrer'],
+					$r['country'],
+					$r['city'],
+					$r['device'],
+					$r['browser'],
+					$r['os'],
+					$r['is_bot']     ? 'Sim' : 'Não',
+					$r['is_private'] ? 'Sim' : 'Não',
+					$r['sid'],
+					$r['time_on_page'],
+				) );
+			}
+		} elseif ( 'security' === $tab ) {
+			// Blacklist de IPs.
+			$entries = OT_Blocklist::all();
+			fputcsv( $out, array( 'IP', 'Motivo', 'Bloqueado em' ) );
+			foreach ( $entries as $e ) {
+				fputcsv( $out, array( $e['ip_address'], $e['reason'], $e['added_at'] ) );
+			}
+		} else {
+			// Abas que dependem de período.
+			$d = OT_Stats::report( $range, $start, $end );
+
+			if ( 'dashboard' === $tab ) {
+				$section( 'KPIs do período (' . $d['range']['from'] . ' a ' . $d['range']['to'] . ')' );
+				fputcsv( $out, array( 'Indicador', 'Valor' ) );
+				$k = $d['kpis'];
+				fputcsv( $out, array( 'Sessões',             $k['sessions'] ) );
+				fputcsv( $out, array( 'Visitantes únicos',   $k['visitors'] ) );
+				fputcsv( $out, array( 'Novos visitantes',    $k['new_visitors'] ) );
+				fputcsv( $out, array( 'Visualizações',       $k['pageviews'] ) );
+				fputcsv( $out, array( 'Duração média (s)',   $k['avg_duration'] ) );
+				fputcsv( $out, array( 'Taxa de rejeição (%)',$k['bounce_rate'] ) );
+				fputcsv( $out, array( 'Páginas por sessão',  $k['pages_session'] ) );
+
+				$section( 'Série temporal diária' );
+				fputcsv( $out, array( 'Data', 'Sessões', 'Visualizações' ) );
+				foreach ( $d['timeseries'] as $r ) {
+					fputcsv( $out, array( $r['date'], $r['sessions'], $r['pageviews'] ) );
+				}
+
+				$section( 'Canais de aquisição' );
+				fputcsv( $out, array( 'Canal', 'Sessões', 'Taxa de rejeição (%)', 'Duração média (s)' ) );
+				foreach ( $d['channels'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'], $r['bounce_rate'], $r['avg_duration'] ) );
+				}
+
+				$section( 'Origens (source)' );
+				fputcsv( $out, array( 'Origem', 'Sessões' ) );
+				foreach ( $d['sources'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+				$section( 'Dispositivos' );
+				fputcsv( $out, array( 'Dispositivo', 'Sessões' ) );
+				foreach ( $d['devices'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+				$section( 'Países' );
+				fputcsv( $out, array( 'País', 'Código', 'Sessões' ) );
+				foreach ( $d['countries'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['cc'], $r['sessions'] ) );
+				}
+
+			} elseif ( 'acquisition' === $tab ) {
+				$section( 'Canais de aquisição' );
+				fputcsv( $out, array( 'Canal', 'Sessões', 'Taxa de rejeição (%)', 'Duração média (s)' ) );
+				foreach ( $d['channels'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'], $r['bounce_rate'], $r['avg_duration'] ) );
+				}
+
+				$section( 'Origens (source)' );
+				fputcsv( $out, array( 'Origem', 'Sessões' ) );
+				foreach ( $d['sources'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+				$section( 'Campanhas (UTM)' );
+				fputcsv( $out, array( 'Campanha', 'Origem', 'Mídia', 'Sessões', 'Duração média (s)' ) );
+				foreach ( $d['campaigns'] as $r ) {
+					fputcsv( $out, array( $r['campaign'], $r['source'], $r['medium'], $r['sessions'], $r['avg_duration'] ) );
+				}
+
+				$section( 'Páginas de entrada (landing)' );
+				fputcsv( $out, array( 'Página', 'Sessões', 'Taxa de rejeição (%)' ) );
+				foreach ( $d['landing'] as $r ) {
+					fputcsv( $out, array( $r['path'], $r['sessions'], $r['bounce_rate'] ) );
+				}
+
+			} elseif ( 'audience' === $tab ) {
+				$section( 'Dispositivos' );
+				fputcsv( $out, array( 'Dispositivo', 'Sessões' ) );
+				foreach ( $d['devices'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+				$section( 'Navegadores' );
+				fputcsv( $out, array( 'Navegador', 'Sessões' ) );
+				foreach ( $d['browsers'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+				$section( 'Sistemas operacionais' );
+				fputcsv( $out, array( 'Sistema operacional', 'Sessões' ) );
+				foreach ( $d['os'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+				$section( 'Países' );
+				fputcsv( $out, array( 'País', 'Código', 'Sessões' ) );
+				foreach ( $d['countries'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['cc'], $r['sessions'] ) );
+				}
+
+				$section( 'Regiões / estados' );
+				fputcsv( $out, array( 'Região', 'Código', 'Sessões' ) );
+				foreach ( $d['regions'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['cc'], $r['sessions'] ) );
+				}
+
+				$section( 'Cidades' );
+				fputcsv( $out, array( 'Cidade', 'Código', 'Sessões' ) );
+				foreach ( $d['cities'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['cc'], $r['sessions'] ) );
+				}
+
+			} elseif ( 'content' === $tab ) {
+				$section( 'Páginas mais vistas' );
+				fputcsv( $out, array( 'Caminho', 'Título', 'Visualizações', 'Sessões', 'Tempo médio (s)' ) );
+				foreach ( $d['pages'] as $r ) {
+					fputcsv( $out, array( $r['path'], $r['title'], $r['views'], $r['sessions'], $r['avg_time'] ) );
+				}
+
+				$section( 'Páginas de entrada (landing)' );
+				fputcsv( $out, array( 'Página', 'Sessões', 'Taxa de rejeição (%)' ) );
+				foreach ( $d['landing'] as $r ) {
+					fputcsv( $out, array( $r['path'], $r['sessions'], $r['bounce_rate'] ) );
+				}
+
+				$section( 'Links de saída (outbound)' );
+				fputcsv( $out, array( 'URL', 'Host', 'Cliques', 'Sessões' ) );
+				foreach ( $d['outbound'] as $r ) {
+					fputcsv( $out, array( $r['url'], $r['host'], $r['clicks'], $r['sessions'] ) );
+				}
+
+				$section( 'Domínios de saída' );
+				fputcsv( $out, array( 'Domínio', 'Cliques' ) );
+				foreach ( $d['outhosts'] as $r ) {
+					fputcsv( $out, array( $r['label'], $r['sessions'] ) );
+				}
+
+			} elseif ( 'goals' === $tab ) {
+				$section( 'Desempenho das metas' );
+				fputcsv( $out, array( 'Meta', 'Critério', 'Valor da URL', 'Conversões', 'Visitantes', 'Total', 'Taxa (%)' ) );
+				foreach ( $d['goals'] as $r ) {
+					fputcsv( $out, array(
+						$r['name'],
+						$r['match_type'],
+						$r['value'],
+						$r['conversions'],
+						$r['visitors'],
+						$r['completions'],
+						$r['rate'],
+					) );
+				}
+			}
+		}
+
+		fclose( $out );
+		exit;
 	}
 
 	/** Nonce + capacidade para endpoints do painel. */

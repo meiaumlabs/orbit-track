@@ -97,6 +97,44 @@
 			'<table class="ot-table"><thead><tr>' + th + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 	}
 
+	/* ── CSV export ──────────────────────────────────────────────────── */
+
+	function exportCsv(tab) {
+		var form = document.createElement('form');
+		form.method = 'POST';
+		form.action = OT.ajax;
+		form.style.display = 'none';
+		[
+			['action', 'ot_export_csv'],
+			['nonce',  OT.nonce],
+			['tab',    tab],
+			['range',  state.range],
+			['start',  state.start],
+			['end',    state.end]
+		].forEach(function (pair) {
+			var inp = document.createElement('input');
+			inp.type = 'hidden';
+			inp.name  = pair[0];
+			inp.value = pair[1];
+			form.appendChild(inp);
+		});
+		document.body.appendChild(form);
+		form.submit();
+		setTimeout(function () { if (form.parentNode) { form.parentNode.removeChild(form); } }, 1500);
+	}
+
+	function addExportBar(tab) {
+		if (!view) { return; }
+		var bar = document.createElement('div');
+		bar.className = 'ot-export-bar';
+		var btn = document.createElement('button');
+		btn.className = 'ot-btn ot-btn-ghost ot-btn-export';
+		btn.textContent = '⬇ Exportar CSV';
+		btn.addEventListener('click', function () { exportCsv(tab); });
+		bar.appendChild(btn);
+		view.insertBefore(bar, view.firstChild);
+	}
+
 	/* ── tabs ────────────────────────────────────────────────────────── */
 
 	function renderDashboard(d) {
@@ -447,7 +485,13 @@
 				'</div>'
 			: '<div class="ot-card ot-card-wide"><p class="ot-empty">Nenhum IP bloqueado.</p></div>';
 
-		view.innerHTML = note + manualAdd + table;
+		view.innerHTML = '<div class="ot-export-bar"><button class="ot-btn ot-btn-ghost ot-btn-export" data-tab="security">⬇ Exportar CSV</button></div>' +
+			note + manualAdd + table;
+
+		var exportBtn = view.querySelector('.ot-btn-export[data-tab="security"]');
+		if (exportBtn) {
+			exportBtn.addEventListener('click', function () { exportCsv('security'); });
+		}
 
 		var addBtn = document.getElementById('ot-bl-add');
 		if (addBtn) {
@@ -483,7 +527,8 @@
 		var rows = data.rows || [];
 		liveLastId = rows.length ? rows[0].id : 0;
 		var body = rows.map(logRow).join('');
-		var html = '<div class="ot-live-head">' +
+		var html = '<div class="ot-export-bar"><button class="ot-btn ot-btn-ghost ot-btn-export" data-tab="live">⬇ Exportar CSV</button></div>' +
+			'<div class="ot-live-head">' +
 			'<div class="ot-online"><span class="ot-online-dot"></span><b>' + fmt(data.online) + '</b> ' + esc(OT.i18n.online) + '</div>' +
 			'<button class="ot-btn ot-btn-ghost" id="ot-live-toggle">' + esc(livePaused ? OT.i18n.paused : OT.i18n.live) + '</button>' +
 			'</div>' +
@@ -492,6 +537,11 @@
 			'<tbody id="ot-log-body">' + (body || '<tr><td colspan="5" class="ot-empty">' + esc(OT.i18n.empty) + '</td></tr>') + '</tbody>' +
 			'</table></div>';
 		view.innerHTML = html;
+
+		var exportBtn = view.querySelector('.ot-btn-export[data-tab="live"]');
+		if (exportBtn) {
+			exportBtn.addEventListener('click', function () { exportCsv('live'); });
+		}
 
 		var toggle = document.getElementById('ot-live-toggle');
 		if (toggle) {
@@ -678,6 +728,7 @@
 				else if (tab === 'content')     { renderContent(d); }
 				else if (tab === 'goals')       { renderGoals(d); }
 				else                            { renderDashboard(d); }
+				addExportBar(tab);
 
 			})
 			.catch(function () {

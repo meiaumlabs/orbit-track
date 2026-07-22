@@ -137,6 +137,11 @@ class OT_Admin {
 					<div class="ot-loading"><?php esc_html_e( 'Carregando…', 'orbit-track' ); ?></div>
 				</div>
 			<?php endif; ?>
+
+			<footer class="ot-sign">
+				<?php esc_html_e( 'Orbit Track — feito pela', 'orbit-track' ); ?>
+				<a href="https://61labs.com.br" target="_blank" rel="noreferrer noopener">61 Labs</a>
+			</footer>
 		</div>
 		<?php
 	}

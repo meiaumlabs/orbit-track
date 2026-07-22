@@ -1,19 +1,30 @@
 /* Orbit Track — painel administrativo 2.x
- * Paleta clara, harmônica com o wp-admin (#f0f0f1).
+ * Identidade 61 Labs sobre superfície clara (harmônica com o wp-admin).
+ * Interativos em "ink" (quase-preto) com texto branco — contraste alto por
+ * construção — a "signal" lime como acento e um teal acessível para links.
  * Sem dependências além das já carregadas em class-ot-admin.php.
  * -------------------------------------------------------------------- */
 
 /* ── Variáveis ─────────────────────────────────────────────────────── */
 .ot-wrap {
 	--ot-card:        #ffffff;
-	--ot-card-2:      #f0f1f4;
-	--ot-line:        #dcdfe4;
-	--ot-text:        #1d2327;
-	--ot-muted:       #6b7280;
-	--ot-primary:     #6366f1;
-	--ot-primary-d:   #4f52d8;
-	--ot-primary-xs:  rgba(99,102,241,.10);
+	--ot-card-2:      #f1f3f6;
+	--ot-line:        #d9dde4;
+	--ot-text:        #16202b;   /* ~13:1 no branco */
+	--ot-muted:       #556070;   /* ~6:1 no branco (era 4.8:1) */
+	/* Interativo principal = ink da marca 61 Labs (texto branco por cima). */
+	--ot-primary:     #0f131b;
+	--ot-primary-d:   #0a0c10;
+	--ot-primary-xs:  rgba(15,19,27,.06);
+	/* Acentos de marca. */
+	--ot-signal:      #c6f24e;
+	--ot-signal-d:    #b6e438;
+	--ot-signal-ink:  #0a0c10;
+	--ot-cyan:        #56d4cd;
+	--ot-link:        #0b7a74;   /* teal acessível para links (~4.8:1) */
+	--ot-focus:       #0b7a74;
 	--ot-green:       #16a34a;
+	--ot-green-t:     #15803d;   /* verde para texto (contraste) */
 	--ot-green-bg:    rgba(22,163,74,.10);
 	--ot-green-bd:    rgba(22,163,74,.25);
 	--ot-red:         #dc2626;
@@ -21,6 +32,7 @@
 	--ot-shadow:      0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
 	--ot-shadow-md:   0 4px 16px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
 	--ot-r:           10px;
+	--ot-gap:         20px;      /* ritmo vertical entre seções */
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
 	color: var(--ot-text);
 	margin-right: 20px;
@@ -37,8 +49,13 @@
 	box-shadow: var(--ot-shadow);
 }
 .ot-brand { display: flex; align-items: center; gap: 14px; }
-.ot-logo { color: var(--ot-primary); width: 42px; height: 42px; display: inline-flex; flex-shrink: 0; }
-.ot-logo svg { width: 42px; height: 42px; }
+.ot-logo {
+	color: var(--ot-signal-ink); background: var(--ot-signal);
+	width: 44px; height: 44px; border-radius: 11px;
+	display: inline-flex; align-items: center; justify-content: center;
+	flex-shrink: 0;
+}
+.ot-logo svg { width: 28px; height: 28px; }
 .ot-brand h1 {
 	font-family: 'Space Grotesk', -apple-system, sans-serif;
 	font-size: 20px; font-weight: 700; margin: 0; color: var(--ot-text); line-height: 1.1;
@@ -52,7 +69,7 @@
 /* ── Abas ──────────────────────────────────────────────────────────── */
 .ot-tabs {
 	display: flex; gap: 3px;
-	margin: 20px 0 22px;
+	margin: var(--ot-gap) 0;
 	background: var(--ot-card);
 	border: 1px solid var(--ot-line);
 	border-radius: 12px; padding: 5px;
@@ -66,14 +83,14 @@
 	transition: background .14s, color .14s;
 }
 .ot-tab:hover { background: var(--ot-card-2); color: var(--ot-text); text-decoration: none; }
-.ot-tab:focus-visible { outline: 2px solid var(--ot-primary); outline-offset: 1px; }
+.ot-tab:focus-visible { outline: 2px solid var(--ot-focus); outline-offset: 1px; }
 .ot-tab.is-active { background: var(--ot-primary); color: #fff; font-weight: 600; }
 .ot-tab.is-active:hover { background: var(--ot-primary-d); }
 
 /* ── Toolbar ───────────────────────────────────────────────────────── */
 .ot-toolbar {
 	display: flex; align-items: center; justify-content: space-between;
-	gap: 12px; margin-bottom: 22px; flex-wrap: wrap;
+	gap: 12px; margin-bottom: var(--ot-gap); flex-wrap: wrap;
 }
 .ot-range {
 	display: inline-flex;
@@ -89,7 +106,7 @@
 	transition: background .12s, color .12s;
 }
 .ot-range-btn:hover { background: var(--ot-card-2); color: var(--ot-text); }
-.ot-range-btn:focus-visible { outline: 2px solid var(--ot-primary); outline-offset: -1px; }
+.ot-range-btn:focus-visible { outline: 2px solid var(--ot-focus); outline-offset: -1px; }
 .ot-range-btn.is-active { background: var(--ot-primary); color: #fff; }
 .ot-datefilter { display: flex; align-items: center; gap: 8px; color: var(--ot-muted); font-size: 13px; flex-wrap: wrap; }
 .ot-datefilter label { display: inline-flex; align-items: center; gap: 5px; }
@@ -98,7 +115,7 @@
 	border-radius: 8px; padding: 6px 10px; font-size: 13px;
 	transition: border-color .12s;
 }
-.ot-datefilter input[type=date]:focus { outline: 2px solid var(--ot-primary); border-color: var(--ot-primary); }
+.ot-datefilter input[type=date]:focus { outline: 2px solid var(--ot-focus); border-color: var(--ot-focus); }
 
 /* ── Botões ────────────────────────────────────────────────────────── */
 .ot-btn {
@@ -108,7 +125,7 @@
 	cursor: pointer; font-weight: 600; font-size: 13px;
 	transition: background .12s, border-color .12s, color .12s;
 }
-.ot-btn:focus-visible { outline: 2px solid var(--ot-primary); outline-offset: 2px; }
+.ot-btn:focus-visible { outline: 2px solid var(--ot-focus); outline-offset: 2px; }
 .ot-btn-primary { background: var(--ot-primary); border-color: var(--ot-primary); color: #fff; }
 .ot-btn-primary:hover { background: var(--ot-primary-d); border-color: var(--ot-primary-d); }
 .ot-btn-ghost:hover { border-color: var(--ot-primary); color: var(--ot-primary); background: var(--ot-primary-xs); }
@@ -116,7 +133,7 @@
 .ot-btn-danger:hover { background: var(--ot-red-bg); border-color: var(--ot-red); }
 
 /* ── KPIs ──────────────────────────────────────────────────────────── */
-.ot-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 22px; }
+.ot-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: var(--ot-gap); }
 .ot-kpi {
 	background: var(--ot-card); border: 1px solid var(--ot-line);
 	border-radius: var(--ot-r); padding: 20px 18px;
@@ -126,7 +143,7 @@
 }
 .ot-kpi::after {
 	content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-	background: linear-gradient(90deg, var(--ot-primary), #a5b4fc);
+	background: linear-gradient(90deg, var(--ot-signal), var(--ot-cyan));
 }
 .ot-kpi-label {
 	color: var(--ot-muted); font-size: 11px; font-weight: 600;
@@ -137,7 +154,7 @@
 	font-size: 32px; font-weight: 700; color: var(--ot-text);
 	line-height: 1; letter-spacing: -.02em;
 }
-.ot-kpi-sub { font-size: 12px; color: var(--ot-green); font-weight: 500; }
+.ot-kpi-sub { font-size: 12px; color: var(--ot-green-t); font-weight: 600; }
 
 /* ── Chart wrappers (F-003: fix Chart.js container height growth loop) ── */
 .ot-chart-box { position: relative; }
@@ -175,7 +192,7 @@
 .ot-bar-track { height: 6px; background: var(--ot-card-2); border-radius: 6px; overflow: hidden; }
 .ot-bar-track span {
 	display: block; height: 100%;
-	background: linear-gradient(90deg, var(--ot-primary), #a5b4fc);
+	background: linear-gradient(90deg, var(--ot-signal), var(--ot-cyan));
 	border-radius: 6px; transition: width .4s ease;
 }
 
@@ -222,7 +239,7 @@
 	color: var(--ot-text); border-radius: 8px; padding: 9px 12px;
 	width: 100%; font-size: 14px; transition: border-color .12s;
 }
-.ot-field input[type=number]:focus { outline: 2px solid var(--ot-primary); border-color: var(--ot-primary); }
+.ot-field input[type=number]:focus { outline: 2px solid var(--ot-focus); border-color: var(--ot-primary); }
 .ot-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .ot-checks { display: flex; flex-wrap: wrap; gap: 8px; }
 .ot-check {
@@ -257,12 +274,12 @@
 }
 .ot-switch input[type=checkbox]:checked { background: var(--ot-primary); }
 .ot-switch input[type=checkbox]:checked::after { left: 19px; }
-.ot-switch input[type=checkbox]:focus-visible { outline: 2px solid var(--ot-primary); outline-offset: 2px; }
+.ot-switch input[type=checkbox]:focus-visible { outline: 2px solid var(--ot-focus); outline-offset: 2px; }
 
 .ot-muted { color: var(--ot-muted); font-size: 12px; line-height: 1.6; }
 .ot-field-actions { display: flex; align-items: center; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
 .ot-save-msg { font-size: 13px; font-weight: 600; }
-.ot-save-msg.ok  { color: var(--ot-green); }
+.ot-save-msg.ok  { color: var(--ot-green-t); }
 .ot-save-msg.err { color: var(--ot-red); }
 
 /* ── Mapa-múndi ────────────────────────────────────────────────────── */
@@ -316,7 +333,7 @@
 	background: var(--ot-card-2); color: var(--ot-muted);
 	border: 1px solid var(--ot-line); vertical-align: middle;
 }
-.ot-tag-entry { background: var(--ot-primary-xs); color: var(--ot-primary); border-color: rgba(99,102,241,.25); }
+.ot-tag-entry { background: var(--ot-primary-xs); color: var(--ot-primary); border-color: rgba(15,19,27,.18); }
 .ot-tag-new   { background: var(--ot-green-bg);   color: #15803d;           border-color: var(--ot-green-bd); }
 
 .ot-chan {
@@ -334,7 +351,7 @@
 .ot-chan-display        { color: #c2410c; }
 .ot-chan-affiliate      { color: #b45309; }
 
-@keyframes ot-flash { from { background-color: rgba(99,102,241,.13); } to { background-color: transparent; } }
+@keyframes ot-flash { from { background-color: rgba(198,242,78,.30); } to { background-color: transparent; } }
 .ot-log-flash td { animation: ot-flash 1.8s ease-out; }
 
 /* ── Log — campos novos ────────────────────────────────────────────── */
@@ -359,7 +376,7 @@
 
 /* ── Tags — bot e privado ──────────────────────────────────────────── */
 .ot-tag-bot     { background: rgba(245,158,11,.15); color: #b45309; border-color: rgba(245,158,11,.35); }
-.ot-tag-private { background: rgba(99,102,241,.1);  color: var(--ot-primary); border-color: rgba(99,102,241,.25); }
+.ot-tag-private { background: var(--ot-primary-xs);  color: var(--ot-primary); border-color: rgba(15,19,27,.18); }
 
 /* ── Botão de bloqueio (no log) ────────────────────────────────────── */
 .ot-btn-block {
@@ -379,7 +396,7 @@
 	color: var(--ot-text); border-radius: 8px; padding: 8px 12px;
 	font-size: 13px; transition: border-color .12s; min-width: 180px;
 }
-.ot-input-text:focus { outline: 2px solid var(--ot-primary); border-color: var(--ot-primary); }
+.ot-input-text:focus { outline: 2px solid var(--ot-focus); border-color: var(--ot-primary); }
 .ot-bl-ip { font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* ── Alerta ────────────────────────────────────────────────────────── */
@@ -389,8 +406,8 @@
 }
 .ot-alert-warn { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.35); color: #92400e; }
 
-.ot-ext { color: var(--ot-primary); text-decoration: none; word-break: break-all; }
-.ot-ext:hover { text-decoration: underline; color: var(--ot-primary-d); }
+.ot-ext { color: var(--ot-link); text-decoration: none; word-break: break-all; }
+.ot-ext:hover { text-decoration: underline; color: #095e59; }
 
 /* ── Barra de exportação CSV ───────────────────────────────────────── */
 .ot-export-bar {
@@ -422,9 +439,25 @@
 	transition: border-color .12s;
 }
 .ot-goal-row input[type=text]:focus,
-.ot-goal-row select:focus { outline: 2px solid var(--ot-primary); border-color: var(--ot-primary); }
+.ot-goal-row select:focus { outline: 2px solid var(--ot-focus); border-color: var(--ot-primary); }
 .ot-goal-active { display: inline-flex; align-items: center; gap: 6px; color: var(--ot-muted); font-size: 12px; white-space: nowrap; }
 .ot-goal-del { padding: 6px 12px; font-size: 16px; line-height: 1; }
+
+/* ── Assinatura 61 Labs ────────────────────────────────────────────── */
+.ot-sign {
+	margin: 28px 0 8px;
+	padding-top: 16px;
+	border-top: 1px solid var(--ot-line);
+	text-align: center;
+	font-size: 12px;
+	color: var(--ot-muted);
+}
+.ot-sign a {
+	color: var(--ot-link);
+	font-weight: 600;
+	text-decoration: none;
+}
+.ot-sign a:hover { text-decoration: underline; color: #095e59; }
 
 /* ── Responsivo ────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
